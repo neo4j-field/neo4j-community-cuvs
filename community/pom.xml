@@ -52,6 +52,7 @@
     <module>kernel-test-utils</module>
     <module>kernel-test</module>
     <module>lucene-index</module>
+    <module>cuvs-index</module>
     <module>fulltext-index</module>
     <module>graph-algo</module>
     <module>neo4j</module>

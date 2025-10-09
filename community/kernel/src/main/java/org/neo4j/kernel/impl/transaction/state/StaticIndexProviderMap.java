@@ -55,6 +55,7 @@ public class StaticIndexProviderMap extends LifecycleAdapter implements IndexPro
     private final IndexProvider fulltextIndexProvider;
     private final IndexProvider vectorV1IndexProvider;
     private final IndexProvider vectorV2IndexProvider;
+    private final IndexProvider cuvsV1IndexProvider;
     private final DependencyResolver dependencies;
 
     public StaticIndexProviderMap(
@@ -66,6 +67,7 @@ public class StaticIndexProviderMap extends LifecycleAdapter implements IndexPro
             FulltextIndexProvider fulltextIndexProvider,
             VectorIndexProvider vectorV1IndexProvider,
             VectorIndexProvider vectorV2IndexProvider,
+            IndexProvider cuvsV1IndexProvider,
             DependencyResolver dependencies) {
         this.tokenIndexProvider = tokenIndexProvider;
         this.rangeIndexProvider = rangeIndexProvider;
@@ -75,6 +77,7 @@ public class StaticIndexProviderMap extends LifecycleAdapter implements IndexPro
         this.fulltextIndexProvider = fulltextIndexProvider;
         this.vectorV1IndexProvider = vectorV1IndexProvider;
         this.vectorV2IndexProvider = vectorV2IndexProvider;
+        this.cuvsV1IndexProvider = cuvsV1IndexProvider;
         this.dependencies = dependencies;
     }
 
@@ -88,7 +91,8 @@ public class StaticIndexProviderMap extends LifecycleAdapter implements IndexPro
                 trigramIndexProvider,
                 fulltextIndexProvider,
                 vectorV1IndexProvider,
-                vectorV2IndexProvider);
+                vectorV2IndexProvider,
+                cuvsV1IndexProvider);
         dependencies.resolveTypeDependencies(IndexProvider.class).forEach(this::add);
     }
 

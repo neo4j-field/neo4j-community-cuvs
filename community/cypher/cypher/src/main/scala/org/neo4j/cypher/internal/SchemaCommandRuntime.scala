@@ -458,6 +458,7 @@ object SchemaCommandRuntime extends CypherRuntime[RuntimeContext] {
           source.map(logicalToExecutable.applyOrElse(_, throwCantCompile).apply(context))
         )
 
+
     // DROP INDEX name [IF EXISTS]
     case DropIndexOnName(name, ifExists) => _ =>
         SchemaExecutionPlan(

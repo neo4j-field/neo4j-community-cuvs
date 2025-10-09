@@ -45,6 +45,9 @@ public interface AllIndexProviderDescriptors {
     IndexProviderDescriptor VECTOR_V2_DESCRIPTOR = new IndexProviderDescriptor("vector", "2.0");
     IndexProviderDescriptor DEFAULT_VECTOR_DESCRIPTOR = VECTOR_V2_DESCRIPTOR;
 
+    IndexProviderDescriptor CUVS_V1_DESCRIPTOR = new IndexProviderDescriptor("cuvs", "1.0");
+    IndexProviderDescriptor DEFAULT_CUVS_DESCRIPTOR = CUVS_V1_DESCRIPTOR;
+
     /**
      * Mapping of {@link IndexProviderDescriptor} to the {@link IndexType}s they describe.
      */
@@ -56,7 +59,8 @@ public interface AllIndexProviderDescriptors {
             RANGE_DESCRIPTOR, IndexType.RANGE,
             POINT_DESCRIPTOR, IndexType.POINT,
             VECTOR_V1_DESCRIPTOR, IndexType.VECTOR,
-            VECTOR_V2_DESCRIPTOR, IndexType.VECTOR);
+            VECTOR_V2_DESCRIPTOR, IndexType.VECTOR,
+            CUVS_V1_DESCRIPTOR, IndexType.VECTOR);
 
     /**
      * Mapping of {@link IndexType} to the latest {@link IndexProviderDescriptor} it can use.
