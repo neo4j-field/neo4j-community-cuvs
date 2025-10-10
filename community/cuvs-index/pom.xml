@@ -61,7 +61,7 @@
         </dependency>
         <dependency>
             <groupId>org.neo4j</groupId>
-            <artifactId>neo4j-kernel</artifactId>
+            <artifactId>neo4j-lucene-index</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

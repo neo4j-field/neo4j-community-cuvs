@@ -26,7 +26,6 @@ Third-party licenses
 --------------------
 
 Apache Software License, Version 2.0
-  aircompressor
   Apache Commons Lang
   Apache Commons Text
   Apache Log4j API
@@ -36,29 +35,14 @@ Apache Software License, Version 2.0
   Apache Lucene (module: common)
   Apache Lucene (module: core)
   Apache Lucene (module: queryparser)
-  Apache Parquet Column
-  Apache Parquet Common
-  Apache Parquet Encodings
-  Apache Parquet Format Structures
-  Apache Parquet Hadoop
   Caffeine cache
   cuvs-java
   IPAddress
-  Jackson datatype: jdk8
   Jackson-annotations
   Jackson-core
   jackson-databind
-  Java Concurrency Tools Core Library
   Java Native Access
   Jettison
-  snappy-java
-  Strategic Blue Parquet Floor
-
-BSD License 2-clause
-  zstd-jni
-
-Common Development and Distribution License Version 1.1
-  javax.annotation API
 
 Eclipse Distribution License - v 1.0
   Eclipse Collections API
@@ -67,12 +51,6 @@ Eclipse Distribution License - v 1.0
 Eclipse Public License - v 1.0
   Eclipse Collections API
   Eclipse Collections Main Library
-
-GNU General Public License, version 2 with the Classpath Exception
-  javax.annotation API
-
-MIT License
-  SLF4J API Module
 
 Dependencies with multiple licenses
 -----------------------------------
@@ -84,8 +62,4 @@ Eclipse Collections API
 Eclipse Collections Main Library
   Eclipse Distribution License - v 1.0
   Eclipse Public License - v 1.0
-
-javax.annotation API
-  Common Development and Distribution License Version 1.1
-  GNU General Public License, version 2 with the Classpath Exception
 

@@ -32,8 +32,8 @@ import org.neo4j.io.layout.DatabaseLayout;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.io.pagecache.context.CursorContextFactory;
 import org.neo4j.io.pagecache.tracing.PageCacheTracer;
-// import org.neo4j.kernel.api.impl.schema.vector.cuvs.CuvsIndexProvider;
-// import org.neo4j.kernel.api.impl.schema.vector.cuvs.CuvsIndexVersion;
+import org.neo4j.kernel.api.impl.schema.vector.cuvs.CuvsIndexProvider;
+import org.neo4j.kernel.api.impl.schema.vector.cuvs.CuvsIndexVersion;
 import org.neo4j.logging.InternalLog;
 import org.neo4j.monitoring.Monitors;
 import org.neo4j.scheduler.JobScheduler;
@@ -45,20 +45,20 @@ import org.neo4j.token.TokenHolders;
  * vector search algorithms for high-performance similarity search.
  */
 public class CuvsIndexProviderFactory extends AbstractIndexProviderFactory<org.neo4j.kernel.api.index.IndexProvider> {
-    // private final CuvsIndexVersion version;
+    private final CuvsIndexVersion version;
 
-    public CuvsIndexProviderFactory(Object version) {
-        // this.version = version;
+    public CuvsIndexProviderFactory(CuvsIndexVersion version) {
+        this.version = version;
     }
 
     @Override
     protected Class<?> loggingClass() {
-        return Object.class; // CuvsIndexProvider.class;
+        return CuvsIndexProvider.class;
     }
 
     @Override
     public IndexProviderDescriptor descriptor() {
-        return null; // version.descriptor();
+        return version.descriptor();
     }
 
     @Override
@@ -77,6 +77,19 @@ public class CuvsIndexProviderFactory extends AbstractIndexProviderFactory<org.n
             CursorContextFactory contextFactory,
             PageCacheTracer pageCacheTracer,
             DependencyResolver dependencyResolver) {
-        return null; // new CuvsIndexProvider(...);
+        
+        var directoryStructureFactory = directoriesByProvider(databaseLayout.databaseDirectory());
+        var directoryStructure = directoryStructureFactory.forProvider(version.descriptor());
+        var storageFactory = new org.neo4j.kernel.api.impl.index.storage.IndexStorageFactory(
+                directoryFactory(fs), fs, directoryStructure);
+        
+        return new CuvsIndexProvider(
+                version,
+                storageFactory,
+                monitors,
+                config,
+                readOnlyDatabaseChecker,
+                scheduler,
+                directoryStructureFactory);
     }
 }

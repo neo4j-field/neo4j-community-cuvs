@@ -20,6 +20,7 @@ Apache Software License, Version 2.0
   Apache Parquet Format Structures
   Apache Parquet Hadoop
   Caffeine cache
+  cuvs-java
   IPAddress
   Jackson datatype: jdk8
   Jackson-annotations

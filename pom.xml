@@ -76,7 +76,7 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <vm.target.version>17</vm.target.version>
+    <vm.target.version>25</vm.target.version>
     <maven.compiler.source>${vm.target.version}</maven.compiler.source>
     <maven.compiler.target>${vm.target.version}</maven.compiler.target>
     <generate-config-docs-phase>prepare-package</generate-config-docs-phase>
@@ -85,6 +85,7 @@
       --add-opens=java.base/java.io=ALL-UNNAMED
       --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
       --add-modules=jdk.incubator.vector
+      -Dnet.bytebuddy.experimental=true
     </jdk.custom.options>
     <test.runner.jvm/>
     <test.runner.jvm.settings.additional/>

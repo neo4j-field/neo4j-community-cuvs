@@ -78,7 +78,7 @@ public enum CuvsIndexVersion {
     },
 
     V1_0(
-            new IndexProviderDescriptor("cuvs", "1.0"), // Temporary hardcoded descriptor
+            AllIndexProviderDescriptors.CUVS_V1_DESCRIPTOR,
             KernelVersion.VERSION_NODE_VECTOR_INDEX_INTRODUCED,
             4096,  // Higher max dimensions for GPU processing
             512,   // Max HNSW M parameter

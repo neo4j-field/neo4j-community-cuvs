@@ -31,8 +31,8 @@ import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.io.pagecache.context.CursorContextFactory;
 import org.neo4j.io.pagecache.tracing.PageCacheTracer;
 import org.neo4j.kernel.api.impl.schema.vector.VectorIndexVersion;
-// import org.neo4j.kernel.api.impl.schema.vector.cuvs.CuvsIndexVersion;
-// import org.neo4j.kernel.impl.index.schema.CuvsIndexProviderFactory;
+import org.neo4j.kernel.api.impl.schema.vector.cuvs.CuvsIndexVersion;
+import org.neo4j.kernel.impl.index.schema.CuvsIndexProviderFactory;
 import org.neo4j.kernel.impl.index.schema.FulltextIndexProviderFactory;
 import org.neo4j.kernel.impl.index.schema.PointIndexProviderFactory;
 import org.neo4j.kernel.impl.index.schema.RangeIndexProviderFactory;
@@ -233,22 +233,22 @@ public class StaticIndexProviderMapFactory {
                         pageCacheTracer,
                         dependencies));
 
-        // var cuvsV1IndexProvider = life.add(new CuvsIndexProviderFactory(CuvsIndexVersion.V1_0)
-        //         .create(
-        //                 pageCache,
-        //                 fs,
-        //                 logService,
-        //                 monitors,
-        //                 databaseConfig,
-        //                 readOnlyChecker,
-        //                 mode,
-        //                 recoveryCleanupWorkCollector,
-        //                 databaseLayout,
-        //                 tokenHolders,
-        //                 scheduler,
-        //                 contextFactory,
-        //                 pageCacheTracer,
-        //                 dependencies));
+        var cuvsV1IndexProvider = life.add(new CuvsIndexProviderFactory(CuvsIndexVersion.V1_0)
+                .create(
+                        pageCache,
+                        fs,
+                        logService,
+                        monitors,
+                        databaseConfig,
+                        readOnlyChecker,
+                        mode,
+                        recoveryCleanupWorkCollector,
+                        databaseLayout,
+                        tokenHolders,
+                        scheduler,
+                        contextFactory,
+                        pageCacheTracer,
+                        dependencies));
 
         return new StaticIndexProviderMap(
                 tokenIndexProvider,
@@ -259,7 +259,7 @@ public class StaticIndexProviderMapFactory {
                 fulltextIndexProvider,
                 vectorV1IndexProvider,
                 vectorV2IndexProvider,
-                null, // cuvsV1IndexProvider,
+                cuvsV1IndexProvider,
                 dependencies);
     }
 }

@@ -54,6 +54,7 @@ class StaticIndexProviderMapTest {
         var fulltextIndexProvider = mockProvider(FulltextIndexProvider.class, IndexType.FULLTEXT);
         var vectorV1IndexProvider = mockProvider(VectorIndexProvider.class, IndexType.VECTOR);
         var vectorV2IndexProvider = mockProvider(VectorIndexProvider.class, IndexType.VECTOR);
+        var cuvsV1IndexProvider = mockProvider(IndexProvider.class, IndexType.VECTOR);
         var map = new StaticIndexProviderMap(
                 tokenIndexProvider,
                 rangeIndexProvider,
@@ -63,6 +64,7 @@ class StaticIndexProviderMapTest {
                 fulltextIndexProvider,
                 vectorV1IndexProvider,
                 vectorV2IndexProvider,
+                cuvsV1IndexProvider,
                 new Dependencies());
         map.init();
 
@@ -84,6 +86,7 @@ class StaticIndexProviderMapTest {
         var fulltextIndexProvider = mockProvider(FulltextIndexProvider.class, IndexType.FULLTEXT);
         var vectorV1IndexProvider = mockProvider(VectorIndexProvider.class, IndexType.VECTOR);
         var vectorV2IndexProvider = mockProvider(VectorIndexProvider.class, IndexType.VECTOR);
+        var cuvsV1IndexProvider = mockProvider(IndexProvider.class, IndexType.VECTOR);
         var map = new StaticIndexProviderMap(
                 tokenIndexProvider,
                 rangeIndexProvider,
@@ -93,6 +96,7 @@ class StaticIndexProviderMapTest {
                 fulltextIndexProvider,
                 vectorV1IndexProvider,
                 vectorV2IndexProvider,
+                cuvsV1IndexProvider,
                 new Dependencies());
         map.init();
 
@@ -126,6 +130,7 @@ class StaticIndexProviderMapTest {
         var fulltextIndexProvider = mockProvider(FulltextIndexProvider.class, IndexType.FULLTEXT);
         var vectorV1IndexProvider = mockProvider(VectorIndexProvider.class, IndexType.VECTOR);
         var vectorV2IndexProvider = mockProvider(VectorIndexProvider.class, IndexType.VECTOR);
+        var cuvsV1IndexProvider = mockProvider(IndexProvider.class, IndexType.VECTOR);
         var map = new StaticIndexProviderMap(
                 tokenIndexProvider,
                 rangeIndexProvider,
@@ -135,6 +140,7 @@ class StaticIndexProviderMapTest {
                 fulltextIndexProvider,
                 vectorV1IndexProvider,
                 vectorV2IndexProvider,
+                cuvsV1IndexProvider,
                 new Dependencies());
         map.init();
 
@@ -166,6 +172,7 @@ class StaticIndexProviderMapTest {
                 mockProvider(FulltextIndexProvider.class, IndexType.FULLTEXT),
                 mockProvider(VectorIndexProvider.class, IndexType.VECTOR),
                 mockProvider(VectorIndexProvider.class, IndexType.VECTOR),
+                mockProvider(IndexProvider.class, IndexType.VECTOR),
                 dependenciesOf(extension));
         map.init();
 
@@ -189,6 +196,7 @@ class StaticIndexProviderMapTest {
                 mockProvider(FulltextIndexProvider.class, IndexType.FULLTEXT),
                 mockProvider(VectorIndexProvider.class, IndexType.VECTOR),
                 mockProvider(VectorIndexProvider.class, IndexType.VECTOR),
+                mockProvider(IndexProvider.class, IndexType.VECTOR),
                 new Dependencies());
         map.init();
 

@@ -91,8 +91,12 @@ public class StaticIndexProviderMap extends LifecycleAdapter implements IndexPro
                 trigramIndexProvider,
                 fulltextIndexProvider,
                 vectorV1IndexProvider,
-                vectorV2IndexProvider,
-                cuvsV1IndexProvider);
+                vectorV2IndexProvider);
+        
+        // Add CUVS provider only if available
+        if (cuvsV1IndexProvider != null) {
+            add(cuvsV1IndexProvider);
+        }
         dependencies.resolveTypeDependencies(IndexProvider.class).forEach(this::add);
     }
 
