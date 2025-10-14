@@ -233,6 +233,8 @@ public class StaticIndexProviderMapFactory {
                         pageCacheTracer,
                         dependencies));
 
+        System.out.println("About to create CUVS provider with version: " + CuvsIndexVersion.V1_0);
+        
         var cuvsV1IndexProvider = life.add(new CuvsIndexProviderFactory(CuvsIndexVersion.V1_0)
                 .create(
                         pageCache,
@@ -249,6 +251,11 @@ public class StaticIndexProviderMapFactory {
                         contextFactory,
                         pageCacheTracer,
                         dependencies));
+
+        System.out.println("CUVS provider created: " + (cuvsV1IndexProvider != null ? "SUCCESS" : "FAILED"));
+        if (cuvsV1IndexProvider != null) {
+            System.out.println("CUVS provider descriptor: " + cuvsV1IndexProvider.getProviderDescriptor());
+        }
 
         return new StaticIndexProviderMap(
                 tokenIndexProvider,

@@ -45,6 +45,12 @@ import org.neo4j.kernel.api.impl.schema.vector.VectorSimilarityFunctions;
 import org.neo4j.util.VisibleForTesting;
 import org.neo4j.values.storable.FloatingPointArray;
 import org.neo4j.values.storable.NumberArray;
+import org.eclipse.collections.api.set.sorted.ImmutableSortedSet;
+import org.eclipse.collections.impl.factory.SortedSets;
+import org.neo4j.kernel.api.impl.schema.vector.VectorIndexConfig;
+import org.neo4j.internal.schema.IndexConfigValidationRecords;
+import org.neo4j.internal.schema.SettingsAccessor;
+import org.neo4j.internal.schema.IndexConfig;
 import org.neo4j.values.storable.Value;
 
 /**
@@ -63,12 +69,9 @@ public enum CuvsIndexVersion {
             BooleanSets.immutable.empty()) {
         @Override
         protected RichIterable<Pair<KernelVersion, CuvsIndexSettingsValidator>> configureValidators() {
-            return Lists.mutable.of(Tuples.pair(
+            return Lists.mutable.<Pair<KernelVersion, CuvsIndexSettingsValidator>>of(Tuples.pair(
                     KernelVersion.EARLIEST,
-                    new CuvsValidatorNotFound(new IllegalStateException("%s not found for '%s'"
-                            .formatted(
-                                    CuvsIndexSettingsValidator.class.getSimpleName(),
-                                    descriptor().name())))));
+                    new BasicCuvsIndexSettingsValidator(CuvsIndexVersion.V1_0)));
         }
 
         @Override
@@ -87,7 +90,12 @@ public enum CuvsIndexVersion {
             BooleanSets.immutable.empty()) {
         @Override
         protected RichIterable<Pair<KernelVersion, CuvsIndexSettingsValidator>> configureValidators() {
-            return Lists.mutable.empty();
+            System.out.println("CuvsIndexVersion.V1_0.configureValidators() called");
+            var validator = new BasicCuvsIndexSettingsValidator(CuvsIndexVersion.V1_0);
+            System.out.println("CuvsIndexVersion.V1_0.configureValidators() created validator: " + validator);
+            return Lists.mutable.<Pair<KernelVersion, CuvsIndexSettingsValidator>>of(
+                    Tuples.pair(KernelVersion.EARLIEST, validator),
+                    Tuples.pair(KernelVersion.VERSION_NODE_VECTOR_INDEX_INTRODUCED, validator));
         }
 
         @Override
@@ -212,27 +220,28 @@ public enum CuvsIndexVersion {
     }
 
     public CuvsIndexSettingsValidator indexSettingValidator() {
+        System.out.println("CuvsIndexVersion.indexSettingValidator() called for version: " + this);
+        System.out.println("CuvsIndexVersion.indexSettingValidator() latestIndexSettingValidator: " + latestIndexSettingValidator);
         return latestIndexSettingValidator;
     }
 
     public CuvsIndexSettingsValidator indexSettingValidator(KernelVersion kernelVersion) {
+        System.out.println("CuvsIndexVersion.indexSettingValidator(kernelVersion) called for version: " + this + ", kernelVersion: " + kernelVersion);
+        System.out.println("CuvsIndexVersion.indexSettingValidator(kernelVersion) validators: " + validators);
+        
         final var validator = validators
                 .keyValuesView()
                 .detect(kernelVersionAndValidator -> kernelVersion.isAtLeast(kernelVersionAndValidator.getOne()));
+        
+        System.out.println("CuvsIndexVersion.indexSettingValidator(kernelVersion) found validator: " + validator);
+        
         if (validator == null) {
+            System.out.println("CuvsIndexVersion.indexSettingValidator(kernelVersion) returning CuvsValidatorNotFoundForKernelVersion");
             return new CuvsValidatorNotFoundForKernelVersion(this, kernelVersion);
         }
 
+        System.out.println("CuvsIndexVersion.indexSettingValidator(kernelVersion) returning validator: " + validator.getTwo());
         return validator.getTwo();
     }
 
-    // Placeholder classes for CUVS-specific validation
-    // These would be implemented similar to VectorIndexSettingsValidator but for CUVS
-    public static class CuvsIndexSettingsValidator {}
-    public static class CuvsValidatorNotFound extends CuvsIndexSettingsValidator {
-        public CuvsValidatorNotFound(Exception e) {}
-    }
-    public static class CuvsValidatorNotFoundForKernelVersion extends CuvsIndexSettingsValidator {
-        public CuvsValidatorNotFoundForKernelVersion(CuvsIndexVersion version, KernelVersion kernelVersion) {}
-    }
 }

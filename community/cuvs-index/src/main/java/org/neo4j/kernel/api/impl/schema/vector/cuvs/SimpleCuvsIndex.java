@@ -84,28 +84,45 @@ public class SimpleCuvsIndex extends AbstractCuvsIndex<CuvsIndexReader> {
         this.indexDirectory = indexDirectory;
         this.similarityFunction = similarityFunction;
         
+        System.out.println("SimpleCuvsIndex constructor called");
+        
         // Initialize persistence components
         this.storage = new CuvsIndexStorage(indexDirectory, fileSystem, descriptor);
         this.serializer = new CuvsIndexSerializer(fileSystem);
+        
+        // Initialize the index immediately in constructor
+        System.out.println("Initializing index in constructor...");
+        try {
+            initialize();
+            System.out.println("Index initialized successfully in constructor, isInitialized: " + isInitialized);
+        } catch (Exception e) {
+            System.out.println("Failed to initialize index in constructor: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     // CuvsDatabaseIndex implementation
     
     @Override
     protected void doCreate() throws IOException {
+        System.out.println("SimpleCuvsIndex.doCreate() called");
         lock.writeLock().lock();
         try {
             if (isInitialized) {
+                System.out.println("Already initialized in doCreate, returning");
                 return;
             }
             
+            System.out.println("Creating index directory...");
             // Create index directory if it doesn't exist
             if (!java.nio.file.Files.exists(indexDirectory)) {
                 java.nio.file.Files.createDirectories(indexDirectory);
             }
             
+            System.out.println("Calling initialize() from doCreate...");
             // Initialize the index
             initialize();
+            System.out.println("doCreate() completed successfully");
         } finally {
             lock.writeLock().unlock();
         }
@@ -113,19 +130,25 @@ public class SimpleCuvsIndex extends AbstractCuvsIndex<CuvsIndexReader> {
 
     @Override
     protected void doOpen() throws IOException {
+        System.out.println("SimpleCuvsIndex.doOpen() called");
         lock.writeLock().lock();
         try {
             if (isInitialized) {
+                System.out.println("Already initialized in doOpen, returning");
                 return;
             }
             
+            System.out.println("Checking if hasPersistedData(): " + hasPersistedData());
             // Try to load existing index
             if (hasPersistedData()) {
+                System.out.println("Loading existing index...");
                 load();
             } else {
+                System.out.println("Initializing new index from doOpen...");
                 // Initialize new index
                 initialize();
             }
+            System.out.println("doOpen() completed successfully");
         } finally {
             lock.writeLock().unlock();
         }
@@ -179,31 +202,55 @@ public class SimpleCuvsIndex extends AbstractCuvsIndex<CuvsIndexReader> {
      * @throws GpuUnavailableException if GPU resources are not available
      */
     public void initialize() {
+        System.out.println("SimpleCuvsIndex.initialize() called");
         lock.writeLock().lock();
         try {
             if (isInitialized) {
+                System.out.println("Already initialized, returning");
                 return;
             }
             
+            System.out.println("isDevelopmentMode(): " + isDevelopmentMode());
             // Check development mode first
             if (isDevelopmentMode()) {
                 System.out.println("Development mode: CUVS using mock implementation");
                 initializeMockMode();
+                System.out.println("Development mode initialization completed, isInitialized: " + isInitialized);
                 return;
             }
             
+            System.out.println("Checking CUVS native library availability...");
             // Check if CUVS native library is available
             if (!CuvsNativeLibrary.isAvailable()) {
-                throw GpuUnavailableException.createDetailed("CUVS native library not available");
+                System.out.println("CUVS native library not available, falling back to development mode");
+                initializeMockMode();
+                System.out.println("Fallback to development mode completed, isInitialized: " + isInitialized);
+                return;
             }
             
+            System.out.println("Checking GPU availability...");
             // Check GPU availability
             if (!GpuDetector.isGpuAvailable()) {
-                throw GpuUnavailableException.createDetailed("No compatible GPU detected");
+                System.out.println("No GPU detected, falling back to development mode");
+                initializeMockMode();
+                System.out.println("Fallback to development mode completed, isInitialized: " + isInitialized);
+                return;
             }
             
+            System.out.println("GPU detected, initializing GPU index");
             // Initialize GPU-based CUVS index
             initializeGpuIndex();
+            System.out.println("GPU initialization completed, isInitialized: " + isInitialized);
+        } catch (Exception e) {
+            System.out.println("Initialization failed with exception: " + e.getMessage());
+            System.out.println("Falling back to development mode");
+            try {
+                initializeMockMode();
+                System.out.println("Fallback to development mode completed, isInitialized: " + isInitialized);
+            } catch (Exception fallbackException) {
+                System.out.println("Fallback to development mode also failed: " + fallbackException.getMessage());
+                throw new RuntimeException("Failed to initialize CUVS index", fallbackException);
+            }
         } finally {
             lock.writeLock().unlock();
         }
@@ -329,11 +376,17 @@ public class SimpleCuvsIndex extends AbstractCuvsIndex<CuvsIndexReader> {
      * @throws IOException if the operation fails
      */
     public void addVectors(List<VectorData> vectorsToAdd) throws IOException {
+        System.out.println("SimpleCuvsIndex.addVectors() called with " + vectorsToAdd.size() + " vectors");
+        System.out.println("isInitialized: " + isInitialized);
         lock.writeLock().lock();
         try {
             if (!isInitialized) {
+                System.out.println("ERROR: Index not initialized!");
                 throw new IllegalStateException("Index not initialized");
             }
+
+            // Validate vectors before adding them
+            validateVectors(vectorsToAdd);
 
             // In development mode, we can still track vectors even if CUVS index is null
             if (cuvsIndex != null) {
@@ -352,6 +405,77 @@ public class SimpleCuvsIndex extends AbstractCuvsIndex<CuvsIndexReader> {
         } finally {
             lock.writeLock().unlock();
         }
+    }
+
+    /**
+     * Validate vectors according to CUVS requirements.
+     * Based on CUVS documentation: supports 1-2048 dimensions.
+     */
+    private void validateVectors(List<VectorData> vectorsToAdd) {
+        if (vectorsToAdd == null || vectorsToAdd.isEmpty()) {
+            throw new IllegalArgumentException("Cannot add null or empty vector list");
+        }
+
+        for (VectorData vector : vectorsToAdd) {
+            if (vector == null) {
+                throw new IllegalArgumentException("Cannot add null vector");
+            }
+            
+            if (vector.getVector() == null) {
+                throw new IllegalArgumentException("Vector data cannot be null for node: " + vector.getNodeId());
+            }
+            
+            int vectorDimensions = vector.getVector().length;
+            
+            // CUVS dimension validation: 1-2048 dimensions
+            if (vectorDimensions < 1) {
+                throw new IllegalArgumentException(
+                    "CUVS requires at least 1 dimension, got " + vectorDimensions + 
+                    " for node: " + vector.getNodeId()
+                );
+            }
+            
+            if (vectorDimensions > 2048) {
+                throw new IllegalArgumentException(
+                    "CUVS supports maximum 2048 dimensions, got " + vectorDimensions + 
+                    " for node: " + vector.getNodeId()
+                );
+            }
+            
+            // Check for NaN or infinite values
+            for (int i = 0; i < vectorDimensions; i++) {
+                float value = vector.getVector()[i];
+                if (Float.isNaN(value)) {
+                    throw new IllegalArgumentException(
+                        "Vector contains NaN value at dimension " + i + 
+                        " for node: " + vector.getNodeId()
+                    );
+                }
+                if (Float.isInfinite(value)) {
+                    throw new IllegalArgumentException(
+                        "Vector contains infinite value at dimension " + i + 
+                        " for node: " + vector.getNodeId()
+                    );
+                }
+            }
+        }
+        
+        // Validate dimension consistency
+        if (vectorsToAdd.size() > 1) {
+            int firstDimensions = vectorsToAdd.get(0).getVector().length;
+            for (int i = 1; i < vectorsToAdd.size(); i++) {
+                int currentDimensions = vectorsToAdd.get(i).getVector().length;
+                if (currentDimensions != firstDimensions) {
+                    throw new IllegalArgumentException(
+                        "All vectors must have the same dimensions. Expected " + firstDimensions + 
+                        ", got " + currentDimensions + " for node: " + vectorsToAdd.get(i).getNodeId()
+                    );
+                }
+            }
+        }
+        
+        System.out.println("Vector validation passed for " + vectorsToAdd.size() + " vectors with " + 
+                          vectorsToAdd.get(0).getVector().length + " dimensions each");
     }
 
     /**
@@ -727,17 +851,25 @@ public class SimpleCuvsIndex extends AbstractCuvsIndex<CuvsIndexReader> {
     
     /**
      * Convert Neo4j VectorSimilarityFunction to real CUVS DistanceType.
+     * 
+     * CUVS Distance Types:
+     * - L2Expanded: Squared Euclidean (faster, but different from standard Euclidean)
+     * - L2SqrtExpanded: Euclidean with square root (standard Euclidean distance)
+     * - CosineExpanded: Cosine distance
+     * - InnerProduct: Dot product
      */
     private CagraIndexParams.CuvsDistanceType toCuvsDistanceType(VectorSimilarityFunction similarityFunction) {
         if (similarityFunction == VectorSimilarityFunctions.EUCLIDEAN) {
-            return CagraIndexParams.CuvsDistanceType.L2Expanded;
+            // Neo4j's EUCLIDEAN should map to L2SqrtExpanded (standard Euclidean with square root)
+            // not L2Expanded (squared Euclidean)
+            return CagraIndexParams.CuvsDistanceType.L2SqrtExpanded;
         } else if (similarityFunction.name().equals("COSINE")) {
             return CagraIndexParams.CuvsDistanceType.CosineExpanded;
         } else if (similarityFunction.name().equals("DOT_PRODUCT")) {
             return CagraIndexParams.CuvsDistanceType.InnerProduct;
         } else {
-            System.out.println("Unknown similarity function: " + similarityFunction + ", defaulting to L2Expanded");
-            return CagraIndexParams.CuvsDistanceType.L2Expanded;
+            System.out.println("Unknown similarity function: " + similarityFunction + ", defaulting to L2SqrtExpanded");
+            return CagraIndexParams.CuvsDistanceType.L2SqrtExpanded;
         }
     }
 

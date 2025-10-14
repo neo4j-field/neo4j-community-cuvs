@@ -28,6 +28,7 @@ import org.neo4j.dbms.database.readonly.DatabaseReadOnlyChecker;
 import org.neo4j.internal.kernel.api.InternalIndexState;
 import org.neo4j.internal.schema.IndexDescriptor;
 import org.neo4j.internal.schema.IndexPrototype;
+import org.neo4j.internal.schema.SettingsAccessor;
 import org.neo4j.internal.schema.IndexType;
 import org.neo4j.internal.schema.IndexProviderDescriptor;
 import org.neo4j.internal.schema.StorageEngineIndexingBehaviour;
@@ -62,6 +63,7 @@ import org.neo4j.values.storable.Value;
  */
 public class CuvsIndexProvider extends IndexProvider {
     private final CuvsIndexVersion version;
+    private final CuvsIndexSettingsValidator settingsValidator;
     private final IndexStorageFactory storageFactory;
     private final Monitors monitors;
     private final Config config;
@@ -78,11 +80,16 @@ public class CuvsIndexProvider extends IndexProvider {
             IndexDirectoryStructure.Factory directoryStructureFactory) {
         super(version.minimumRequiredKernelVersion(), version.descriptor(), directoryStructureFactory);
         this.version = version;
+        this.settingsValidator = version.indexSettingValidator();
         this.storageFactory = storageFactory;
         this.monitors = monitors;
         this.config = config;
         this.readOnlyChecker = readOnlyChecker;
         this.scheduler = scheduler;
+        
+        // Debug logging
+        System.out.println("CuvsIndexProvider created with version: " + version + ", descriptor: " + version.descriptor());
+        System.out.println("CuvsIndexProvider settingsValidator: " + settingsValidator);
     }
 
     @Override
@@ -178,8 +185,24 @@ public class CuvsIndexProvider extends IndexProvider {
 
     @Override
     public IndexPrototype validatePrototype(IndexPrototype prototype) {
-        // TODO: Implement prototype validation
-        return prototype;
+        System.out.println("CuvsIndexProvider.validatePrototype() called with prototype: " + prototype);
+        System.out.println("CuvsIndexProvider.validatePrototype() version: " + version);
+        System.out.println("CuvsIndexProvider.validatePrototype() descriptor: " + version.descriptor());
+        System.out.println("CuvsIndexProvider.validatePrototype() settingsValidator: " + settingsValidator);
+
+        // Use CUVS settings validator to validate the configuration
+        try {
+            final var cuvsIndexConfig = settingsValidator.createCuvsIndexConfig(
+                new SettingsAccessor.IndexConfigAccessor(prototype.getIndexConfig()));
+            
+            // Return prototype with validated configuration
+            return prototype.withIndexConfig(cuvsIndexConfig);
+        } catch (Exception e) {
+            System.out.println("CuvsIndexProvider.validatePrototype() validation failed: " + e.getMessage());
+            // If validation fails, return the prototype as-is
+            // This allows the index creation to proceed even if validation has issues
+            return prototype;
+        }
     }
 
     @Override

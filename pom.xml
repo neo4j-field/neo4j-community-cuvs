@@ -76,7 +76,7 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <vm.target.version>25</vm.target.version>
+    <vm.target.version>22</vm.target.version>
     <maven.compiler.source>${vm.target.version}</maven.compiler.source>
     <maven.compiler.target>${vm.target.version}</maven.compiler.target>
     <generate-config-docs-phase>prepare-package</generate-config-docs-phase>
@@ -149,7 +149,7 @@
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <jetty.version>10.0.24</jetty.version>
     <scala-maven-plugin.version>4.9.2</scala-maven-plugin.version>
-    <scala.version>2.13.11</scala.version>
+    <scala.version>2.13.16</scala.version>
     <scala.binary.version>2.13</scala.binary.version>
     <scala.plugin.recompileMode>all</scala.plugin.recompileMode>
     <scala.test.version>3.2.13</scala.test.version>
@@ -965,6 +965,11 @@
                   <groupId>com.google.errorprone</groupId>
                   <artifactId>error_prone_core</artifactId>
                   <version>${error_prone.version}</version>
+                </path>
+                <path>
+                  <groupId>org.neo4j</groupId>
+                  <artifactId>annotations</artifactId>
+                  <version>${project.version}</version>
                 </path>
               </annotationProcessorPaths>
             </configuration>

@@ -91,12 +91,8 @@ public class StaticIndexProviderMap extends LifecycleAdapter implements IndexPro
                 trigramIndexProvider,
                 fulltextIndexProvider,
                 vectorV1IndexProvider,
-                vectorV2IndexProvider);
-        
-        // Add CUVS provider only if available
-        if (cuvsV1IndexProvider != null) {
-            add(cuvsV1IndexProvider);
-        }
+                vectorV2IndexProvider,
+                cuvsV1IndexProvider);
         dependencies.resolveTypeDependencies(IndexProvider.class).forEach(this::add);
     }
 
@@ -127,12 +123,30 @@ public class StaticIndexProviderMap extends LifecycleAdapter implements IndexPro
 
     @Override
     public IndexProvider getVectorIndexProvider() {
+        System.out.println("getVectorIndexProvider() called");
+        System.out.println("cuvsV1IndexProvider: " + cuvsV1IndexProvider);
+        System.out.println("vectorV2IndexProvider: " + vectorV2IndexProvider);
+        System.out.println("vectorV1IndexProvider: " + vectorV1IndexProvider);
+        
+        // Prefer CUVS provider if available, otherwise fall back to Lucene providers
+        if (cuvsV1IndexProvider != null) {
+            System.out.println("Returning CUVS provider: " + cuvsV1IndexProvider.getProviderDescriptor());
+            return cuvsV1IndexProvider;
+        }
+        System.out.println("CUVS provider is null, falling back to Lucene");
         return vectorV2IndexProvider != null ? vectorV2IndexProvider : vectorV1IndexProvider;
     }
 
     @Override
     public IndexProvider lookup(IndexProviderDescriptor providerDescriptor) {
+        System.out.println("lookup() called with descriptor: " + providerDescriptor);
         IndexProvider provider = indexProvidersByDescriptor.get(providerDescriptor);
+        System.out.println("Found provider: " + provider);
+        if (provider == null) {
+            System.out.println("Provider not found! Available providers:");
+            indexProvidersByDescriptor.forEach((desc, prov) -> 
+                System.out.println("  - " + desc + " -> " + prov));
+        }
         assertProviderFound(provider, providerDescriptor.name());
         return provider;
     }

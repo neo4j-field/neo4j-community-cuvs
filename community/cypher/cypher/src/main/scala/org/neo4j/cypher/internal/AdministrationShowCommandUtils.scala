@@ -40,7 +40,9 @@ object AdministrationShowCommandUtils {
   private val prettifier = Prettifier(ExpressionStringifier {
     case ParameterFromSlot(_, name, _) => s"$$${ExpressionStringifier.backtick(name)}"
     case expression                    => ExpressionStringifier.failingExtender(expression)
-  }).IndentingQueryPrettifier()
+  })
+  
+  private val queryPrettifier = new prettifier.IndentingQueryPrettifier()
 
   private def genDefaultOrderBy(columns: List[String], defaultOrder: Seq[String]): Option[OrderBy] =
     defaultOrder.filter(columns.contains) match {
@@ -126,7 +128,7 @@ object AdministrationShowCommandUtils {
           None
         )(InputPosition.NONE))
     }
-    clauses.map(prettifier.asString).mkString(" ")
+    clauses.map(queryPrettifier.asString).mkString(" ")
   }
 
   private def generateReturnItemsFromAliases(ri: ReturnItems): ReturnItems = {

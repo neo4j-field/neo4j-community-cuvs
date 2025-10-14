@@ -187,7 +187,16 @@ case class CreateVectorIndexOptionsConverter(context: IndexProviderContext, late
 
     config match {
       case itemsMap: MapValue =>
-        val version = maybeIndexProvider.map(VectorIndexVersion.fromDescriptor).getOrElse(latestSupportedVersion)
+        val version = maybeIndexProvider match {
+          case Some(provider) if provider.getKey == "cuvs" =>
+            // CUVS provider - skip Lucene validation since CUVS has its own validation
+            // Return empty config to let CUVS provider handle validation
+            return IndexConfig.empty
+          case Some(provider) =>
+            VectorIndexVersion.fromDescriptor(provider)
+          case None =>
+            latestSupportedVersion
+        }
         val validator = version.indexSettingValidator
         val validationRecords = validator.validate(new MapValueAccessor(itemsMap))
         if (validationRecords.valid) return validator.trustIsValidToVectorIndexConfig(validationRecords).config

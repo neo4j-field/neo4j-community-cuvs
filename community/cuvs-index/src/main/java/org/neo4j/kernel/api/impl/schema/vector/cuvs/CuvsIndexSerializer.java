@@ -49,6 +49,14 @@ public class CuvsIndexSerializer {
      * Serializes the CUVS index data to disk.
      */
     public void serializeIndex(CuvsIndexData indexData, Path indexDataFile, Path vectorDataFile) throws IOException {
+        // Ensure parent directories exist
+        if (indexDataFile.getParent() != null) {
+            fileSystem.mkdirs(indexDataFile.getParent());
+        }
+        if (vectorDataFile.getParent() != null) {
+            fileSystem.mkdirs(vectorDataFile.getParent());
+        }
+        
         // Serialize index metadata
         try (var outputStream = fileSystem.openAsOutputStream(indexDataFile, false)) {
             var dataOutput = new DataOutputStream(outputStream);

@@ -48,6 +48,7 @@ public class CuvsIndexProviderFactory extends AbstractIndexProviderFactory<org.n
     private final CuvsIndexVersion version;
 
     public CuvsIndexProviderFactory(CuvsIndexVersion version) {
+        System.out.println("CuvsIndexProviderFactory constructor called with version: " + version);
         this.version = version;
     }
 
@@ -78,18 +79,29 @@ public class CuvsIndexProviderFactory extends AbstractIndexProviderFactory<org.n
             PageCacheTracer pageCacheTracer,
             DependencyResolver dependencyResolver) {
         
-        var directoryStructureFactory = directoriesByProvider(databaseLayout.databaseDirectory());
-        var directoryStructure = directoryStructureFactory.forProvider(version.descriptor());
-        var storageFactory = new org.neo4j.kernel.api.impl.index.storage.IndexStorageFactory(
-                directoryFactory(fs), fs, directoryStructure);
+        System.out.println("CuvsIndexProviderFactory.internalCreate() called with version: " + version);
         
-        return new CuvsIndexProvider(
-                version,
-                storageFactory,
-                monitors,
-                config,
-                readOnlyDatabaseChecker,
-                scheduler,
-                directoryStructureFactory);
+        try {
+            var directoryStructureFactory = directoriesByProvider(databaseLayout.databaseDirectory());
+            var directoryStructure = directoryStructureFactory.forProvider(version.descriptor());
+            var storageFactory = new org.neo4j.kernel.api.impl.index.storage.IndexStorageFactory(
+                    directoryFactory(fs), fs, directoryStructure);
+            
+            var provider = new CuvsIndexProvider(
+                    version,
+                    storageFactory,
+                    monitors,
+                    config,
+                    readOnlyDatabaseChecker,
+                    scheduler,
+                    directoryStructureFactory);
+            
+            System.out.println("CuvsIndexProvider created successfully with descriptor: " + provider.getProviderDescriptor());
+            return provider;
+        } catch (Exception e) {
+            System.err.println("Failed to create CuvsIndexProvider: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
     }
 }

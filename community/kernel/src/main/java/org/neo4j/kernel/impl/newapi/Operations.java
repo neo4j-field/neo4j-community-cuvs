@@ -1668,32 +1668,39 @@ public class Operations implements Write, SchemaWrite, Upgrade {
                 case RELATIONSHIP -> {
                     boolean supported = true;
                     final var descriptor = prototype.getIndexProvider();
-                    final var version = VectorIndexVersion.fromDescriptor(descriptor);
-                    final var unsupportedMessage =
-                            new StringBuilder().append("Failed to create relationship vector index.");
-                    if (version == VectorIndexVersion.V1_0) {
-                        supported = false;
-                        final var latestDescriptor = VectorIndexVersion.latestSupportedVersion(
-                                        dbmsRuntimeVersionProvider.getVersion().kernelVersion())
-                                .descriptor();
-                        unsupportedMessage
-                                .append(" Relationship vector indexes with provider '")
-                                .append(descriptor.name())
-                                .append("' are not supported");
-
-                        if (!latestDescriptor.equals(descriptor)) {
+                    
+                    // Skip validation for CUVS providers since they have their own validation
+                    if ("cuvs".equals(descriptor.getKey())) {
+                        // CUVS providers handle their own validation
+                        supported = true;
+                    } else {
+                        final var version = VectorIndexVersion.fromDescriptor(descriptor);
+                        final var unsupportedMessage =
+                                new StringBuilder().append("Failed to create relationship vector index.");
+                        if (version == VectorIndexVersion.V1_0) {
+                            supported = false;
+                            final var latestDescriptor = VectorIndexVersion.latestSupportedVersion(
+                                            dbmsRuntimeVersionProvider.getVersion().kernelVersion())
+                                    .descriptor();
                             unsupportedMessage
-                                    .append(", use a newer vector index provider such as '")
-                                    .append(latestDescriptor.name())
-                                    .append('\'');
+                                    .append(" Relationship vector indexes with provider '")
+                                    .append(descriptor.name())
+                                    .append("' are not supported");
+
+                            if (!latestDescriptor.equals(descriptor)) {
+                                unsupportedMessage
+                                        .append(", use a newer vector index provider such as '")
+                                        .append(latestDescriptor.name())
+                                        .append('\'');
+                            }
+
+                            unsupportedMessage.append('.');
                         }
 
-                        unsupportedMessage.append('.');
-                    }
-
-                    supported &= checkSupportedInVerson(unsupportedMessage, KernelVersion.VERSION_VECTOR_2_INTRODUCED);
-                    if (!supported) {
-                        throw new UnsupportedOperationException(unsupportedMessage.toString());
+                        supported &= checkSupportedInVerson(unsupportedMessage, KernelVersion.VERSION_VECTOR_2_INTRODUCED);
+                        if (!supported) {
+                            throw new UnsupportedOperationException(unsupportedMessage.toString());
+                        }
                     }
                 }
             }
@@ -1756,6 +1763,11 @@ public class Operations implements Write, SchemaWrite, Upgrade {
     }
 
     private IndexPrototype useLatestIndexProviderVersion(IndexPrototype prototype) {
+        System.out.println("useLatestIndexProviderVersion called with prototype: " + prototype);
+        System.out.println("prototype.getIndexProvider(): " + prototype.getIndexProvider());
+        System.out.println("AllIndexProviderDescriptors.UNDECIDED: " + AllIndexProviderDescriptors.UNDECIDED);
+        System.out.println("alwaysUseLatestIndexProvider: " + alwaysUseLatestIndexProvider);
+        
         IndexProviderDescriptor indexProviderDescriptor =
                 alwaysUseLatestIndexProvider || prototype.getIndexProvider() == AllIndexProviderDescriptors.UNDECIDED
                         ? switch (prototype.getIndexType()) {
@@ -1767,6 +1779,8 @@ public class Operations implements Write, SchemaWrite, Upgrade {
                             case VECTOR -> indexProviders.getVectorIndexProvider();
                         }
                         : prototype.getIndexProvider();
+        
+        System.out.println("Selected indexProviderDescriptor: " + indexProviderDescriptor);
         final var indexProvider = indexProviders.getIndexProvider(indexProviderDescriptor);
 
         // Technically this can fail when trying to create with the latest provider before upgrade.
