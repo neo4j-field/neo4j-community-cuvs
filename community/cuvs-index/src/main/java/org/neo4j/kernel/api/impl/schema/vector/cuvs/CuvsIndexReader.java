@@ -42,7 +42,7 @@ import org.neo4j.values.storable.Values;
 import org.neo4j.values.storable.Value;
 
 // CUVS imports
-import com.nvidia.cuvs.TieredIndexQuery;
+import com.nvidia.cuvs.CagraQuery;
 import com.nvidia.cuvs.CagraSearchParams;
 import com.nvidia.cuvs.SearchResults;
 
@@ -53,13 +53,13 @@ import com.nvidia.cuvs.SearchResults;
 public class CuvsIndexReader implements ValueIndexReader {
     private final IndexDescriptor descriptor;
     private final IndexUsageTracking usageTracker;
-    private final SimpleCuvsIndex cuvsIndex;
+    private final CagraCuvsIndexImpl cuvsIndex;
     private final OptionalInt dimensions;
 
     public CuvsIndexReader(
             IndexDescriptor descriptor,
             IndexUsageTracking usageTracker,
-            SimpleCuvsIndex cuvsIndex,
+            CagraCuvsIndexImpl cuvsIndex,
             OptionalInt dimensions) {
         this.descriptor = descriptor;
         this.usageTracker = usageTracker;
@@ -95,6 +95,8 @@ public class CuvsIndexReader implements ValueIndexReader {
             PropertyIndexQuery... predicates)
             throws IndexNotApplicableKernelException {
         
+        System.out.println("CuvsIndexReader.query() called with " + predicates.length + " predicates");
+        
         if (predicates.length != 1) {
             throw new IndexNotApplicableKernelException(
                 "CUVS index does not support composite queries. Got " + predicates.length + " predicates.");
@@ -111,6 +113,9 @@ public class CuvsIndexReader implements ValueIndexReader {
         final var nearestNeighborsPredicate = (NearestNeighborsPredicate) predicate;
         final var queryVector = nearestNeighborsPredicate.query();
         
+        System.out.println("CuvsIndexReader: Query vector dimensions: " + queryVector.length);
+        System.out.println("CuvsIndexReader: Expected dimensions: " + (dimensions.isPresent() ? dimensions.getAsInt() : "not set"));
+        
         // Validate dimensions
         if (dimensions.isPresent() && queryVector.length != dimensions.getAsInt()) {
             throw new IndexNotApplicableKernelException(
@@ -123,6 +128,8 @@ public class CuvsIndexReader implements ValueIndexReader {
         final var skip = constraints.skip().orElse(0);
         final var limit = constraints.limit().orElse(Integer.MAX_VALUE);
         final var effectiveK = (int) Math.min(requestedK + skip, limit);
+        
+        System.out.println("CuvsIndexReader: Search params - requestedK: " + requestedK + ", skip: " + skip + ", limit: " + limit + ", effectiveK: " + effectiveK);
 
         // Track usage
         if (context.monitor() != null) {
@@ -131,6 +138,7 @@ public class CuvsIndexReader implements ValueIndexReader {
         usageTracker.queried();
 
         // Create progressor for the query
+        System.out.println("CuvsIndexReader: Creating progressor - cuvsIndex: " + cuvsIndex.getCuvsIndex() + ", cuvsResources: " + cuvsIndex.getCuvsResources());
         final var progressor = new CuvsIndexProgressor(
             cuvsIndex.getCuvsIndex(),
             cuvsIndex.getCuvsResources(),
@@ -140,6 +148,7 @@ public class CuvsIndexReader implements ValueIndexReader {
             client);
 
         // Initialize the client with our progressor
+        System.out.println("CuvsIndexReader: Initializing client with progressor");
         client.initializeQuery(descriptor, progressor, false, false, constraints, predicate);
     }
 
@@ -155,14 +164,14 @@ public class CuvsIndexReader implements ValueIndexReader {
     @Override
     public void close() {
         // CUVS index reader doesn't need explicit cleanup
-        // The underlying SimpleCuvsIndex manages its own resources
+        // The underlying CagraCuvsIndexImpl manages its own resources
     }
 
     /**
      * Index progressor that handles CUVS search results and feeds them to the client.
      */
     private static class CuvsIndexProgressor implements IndexProgressor {
-        private final com.nvidia.cuvs.TieredIndex cuvsIndex;
+        private final com.nvidia.cuvs.CagraIndex cuvsIndex;
         private final com.nvidia.cuvs.CuVSResources cuvsResources;
         private final float[] queryVector;
         private final int effectiveK;
@@ -174,7 +183,7 @@ public class CuvsIndexReader implements ValueIndexReader {
         private int skippedCount = 0;
 
         public CuvsIndexProgressor(
-                com.nvidia.cuvs.TieredIndex cuvsIndex,
+                com.nvidia.cuvs.CagraIndex cuvsIndex,
                 com.nvidia.cuvs.CuVSResources cuvsResources,
                 float[] queryVector,
                 int effectiveK,
@@ -193,70 +202,105 @@ public class CuvsIndexReader implements ValueIndexReader {
             try {
                 // Lazy initialization of search results
                 if (searchResults == null) {
+                    System.out.println("CuvsIndexProgressor: Performing CUVS search...");
                     searchResults = performCuvsSearch();
+                    System.out.println("CuvsIndexProgressor: Search returned " + searchResults.size() + " results");
                 }
 
-                // Skip the requested number of results
-                while (skippedCount < skip && currentIndex < searchResults.size()) {
-                    currentIndex++;
-                    skippedCount++;
-                }
-
-                // Return results up to effectiveK
-                if (currentIndex < searchResults.size() && (currentIndex - skippedCount) < effectiveK) {
+                // Find the next result to return
+                while (currentIndex < searchResults.size()) {
                     SearchResult result = searchResults.get(currentIndex);
                     currentIndex++;
                     
-                    // Convert CUVS result to Neo4j format
-                    Value queryValue = Values.floatArray(queryVector); // Query vector as value
-                    return client.acceptEntity(result.getNodeId(), (float) result.getScore(), queryValue);
+                    // Check if we should skip this result
+                    if (skippedCount < skip) {
+                        skippedCount++;
+                        System.out.println("CuvsIndexProgressor: Skipping result " + skippedCount + "/" + skip);
+                        continue; // Skip this result
+                    }
+                    
+                    // Check if we've reached the limit
+                    if ((skippedCount - skip) >= effectiveK) {
+                        System.out.println("CuvsIndexProgressor: Reached limit of " + effectiveK + " results");
+                        return false; // No more results
+                    }
+                    
+                    // Return this result
+                    System.out.println("CuvsIndexProgressor: Returning result - nodeId: " + result.getNodeId() + ", score: " + result.getScore());
+                    boolean accepted = client.acceptEntity(result.getNodeId(), (float) result.getScore(), (Value[]) null);
+                    System.out.println("CuvsIndexProgressor: Client accepted result: " + accepted);
+                    skippedCount++;
+                    return accepted;
                 }
-
+                
+                System.out.println("CuvsIndexProgressor: No more results to return");
                 return false; // No more results
             } catch (IOException e) {
+                System.out.println("CuvsIndexProgressor: Error during search: " + e.getMessage());
+                e.printStackTrace();
                 throw new RuntimeException("Failed to search CUVS index", e);
             }
         }
 
         private List<SearchResult> performCuvsSearch() throws IOException {
+            System.out.println("CuvsIndexProgressor.performCuvsSearch() called");
+            System.out.println("CuvsIndexProgressor: cuvsIndex is " + (cuvsIndex == null ? "null" : "not null"));
+            System.out.println("CuvsIndexProgressor: cuvsResources is " + (cuvsResources == null ? "null" : "not null"));
+            
             if (cuvsIndex == null) {
-                // Development mode - perform mock search using in-memory vectors
+                // Development mode - return empty results for now
                 System.out.println("Development mode: Performing mock CUVS search");
-                return CuvsIndexReader.performMockSearch(queryVector, effectiveK, skip);
+                return performMockSearch(queryVector, effectiveK, skip);
             }
             
-            // Create search parameters for TieredIndex
+            System.out.println("GPU mode: Performing actual CUVS search");
+            
+            // Create search parameters for CAGRA
             CagraSearchParams searchParams = new CagraSearchParams.Builder(cuvsResources)
                 .withMaxIterations(20)
                 .build();
             
-            // Create TieredIndexQuery
-            TieredIndexQuery query = new TieredIndexQuery.Builder()
+            // Create CagraQuery
+            CagraQuery query = new CagraQuery.Builder()
                 .withQueryVectors(new float[][]{queryVector})
                 .withTopK(effectiveK + skip)
                 .withSearchParams(searchParams)
                 .build();
             
+            System.out.println("CuvsIndexProgressor: Created CagraQuery with topK: " + (effectiveK + skip));
+            
             // Perform search
             SearchResults searchResults;
             try {
+                System.out.println("CuvsIndexProgressor: Calling cuvsIndex.search()...");
                 searchResults = cuvsIndex.search(query);
+                System.out.println("CuvsIndexProgressor: Search completed successfully");
             } catch (Throwable e) {
-                throw new IOException("Failed to search TieredIndex: " + e.getMessage(), e);
+                System.out.println("CuvsIndexProgressor: Search failed: " + e.getMessage());
+                e.printStackTrace();
+                throw new IOException("Failed to search CAGRA index: " + e.getMessage(), e);
             }
             
             // Convert results to our format
+            // CUVS returns Map<Integer, Float> where key is index position, not node ID
+            // For now, we'll assume the key is the node ID (this might need fixing later)
             List<SearchResult> results = new ArrayList<>();
             List<Map<Integer, Float>> resultMaps = searchResults.getResults();
+            System.out.println("CuvsIndexProgressor: CUVS returned " + resultMaps.size() + " result maps");
+            
             if (!resultMaps.isEmpty()) {
                 Map<Integer, Float> firstQueryResults = resultMaps.get(0);
+                System.out.println("CuvsIndexProgressor: First query has " + firstQueryResults.size() + " results");
+                
                 for (Map.Entry<Integer, Float> entry : firstQueryResults.entrySet()) {
-                    long nodeId = entry.getKey();
+                    long nodeId = entry.getKey(); // This might be wrong - could be index position
                     float score = entry.getValue();
+                    System.out.println("CuvsIndexProgressor: Result - nodeId: " + nodeId + ", score: " + score);
                     results.add(new SearchResult(nodeId, score, Map.of()));
                 }
             }
             
+            System.out.println("CuvsIndexProgressor: Returning " + results.size() + " results");
             return results;
         }
 
@@ -294,15 +338,10 @@ public class CuvsIndexReader implements ValueIndexReader {
     }
     
     /**
-     * Perform mock search in development mode using in-memory vectors.
-     * This implements a simple Euclidean distance search for testing purposes.
+     * Perform mock search in development mode.
+     * Returns empty results for now.
      */
     private static List<SearchResult> performMockSearch(float[] queryVector, int effectiveK, int skip) {
-        System.out.println("Development mode: Skipping CUVS index operations, vectors tracked in memory");
-        
-        // Get vectors from the CUVS index - we need to access the vectors through the index
-        // For now, we'll return empty results since we don't have direct access to the vectors
-        // In a real implementation, we'd need to add a getVectors() method to SimpleCuvsIndex
         System.out.println("Development mode: Mock search - returning empty results for now");
         return new ArrayList<>();
     }

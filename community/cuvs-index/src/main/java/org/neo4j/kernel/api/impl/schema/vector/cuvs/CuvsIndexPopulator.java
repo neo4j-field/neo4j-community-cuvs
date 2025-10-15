@@ -38,14 +38,14 @@ import org.neo4j.storageengine.api.ValueIndexEntryUpdate;
  * Handles batch operations during index creation, similar to VectorIndexPopulator.
  */
 public class CuvsIndexPopulator implements IndexPopulator {
-    private final SimpleCuvsIndex cuvsIndex;
+    private final CagraCuvsIndexImpl cuvsIndex;
     private final IndexDescriptor descriptor;
     private final IndexUpdateIgnoreStrategy ignoreStrategy;
-    private final List<SimpleCuvsIndex.VectorData> pendingVectors = new ArrayList<>();
+    private final List<CagraCuvsIndexImpl.VectorData> pendingVectors = new ArrayList<>();
     private boolean closed = false;
 
     public CuvsIndexPopulator(
-            SimpleCuvsIndex cuvsIndex,
+            CagraCuvsIndexImpl cuvsIndex,
             IndexDescriptor descriptor,
             IndexUpdateIgnoreStrategy ignoreStrategy) {
         this.cuvsIndex = cuvsIndex;
@@ -55,7 +55,7 @@ public class CuvsIndexPopulator implements IndexPopulator {
 
     @Override
     public void create() throws IOException {
-        // CUVS index creation is handled by SimpleCuvsIndex
+        // CUVS index creation is handled by CagraCuvsIndexImpl
         // This is a no-op as the index is already created
     }
 
@@ -120,7 +120,7 @@ public class CuvsIndexPopulator implements IndexPopulator {
                 vector[i] = candidate.floatElement(i);
             }
             
-            SimpleCuvsIndex.VectorData vectorData = new SimpleCuvsIndex.VectorData(
+            CagraCuvsIndexImpl.VectorData vectorData = new CagraCuvsIndexImpl.VectorData(
                 entityId, 
                 vector, 
                 java.util.Map.of()
@@ -144,7 +144,7 @@ public class CuvsIndexPopulator implements IndexPopulator {
 
     @Override
     public void drop() {
-        // CUVS index dropping is handled by SimpleCuvsIndex
+        // CUVS index dropping is handled by CagraCuvsIndexImpl
         // This is a no-op as the index handles its own cleanup
     }
 

@@ -50,7 +50,7 @@ public class CuvsIntegrationTest {
     void shouldCompleteFullWorkflow() throws IOException {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/integration-test-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -63,10 +63,10 @@ public class CuvsIntegrationTest {
         assertEquals(InternalIndexState.ONLINE, index.getState());
 
         // 2. Add vectors
-        List<SimpleCuvsIndex.VectorData> vectors = List.of(
-            new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of("name", "vector1")),
-            new SimpleCuvsIndex.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of("name", "vector2")),
-            new SimpleCuvsIndex.VectorData(3L, new float[]{7.0f, 8.0f, 9.0f}, Map.of("name", "vector3"))
+        List<CagraCuvsIndexImpl.VectorData> vectors = List.of(
+            new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of("name", "vector1")),
+            new CagraCuvsIndexImpl.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of("name", "vector2")),
+            new CagraCuvsIndexImpl.VectorData(3L, new float[]{7.0f, 8.0f, 9.0f}, Map.of("name", "vector3"))
         );
         index.addVectors(vectors);
 
@@ -101,7 +101,7 @@ public class CuvsIntegrationTest {
 
         for (VectorSimilarityFunction function : functions) {
             // When
-            SimpleCuvsIndex index = new SimpleCuvsIndex(
+            CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
                 descriptor,
                 Paths.get("/tmp/integration-test-" + function.name()),
                 function,
@@ -114,8 +114,8 @@ public class CuvsIntegrationTest {
             assertEquals(function.name(), stats.get("similarityFunction"));
 
             // Add some vectors
-            List<SimpleCuvsIndex.VectorData> vectors = List.of(
-                new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f, 2.0f}, Map.of())
+            List<CagraCuvsIndexImpl.VectorData> vectors = List.of(
+                new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f, 2.0f}, Map.of())
             );
             index.addVectors(vectors);
 
@@ -134,13 +134,13 @@ public class CuvsIntegrationTest {
         IndexDescriptor descriptor = createTestDescriptor();
 
         // When - Create multiple index instances
-        SimpleCuvsIndex index1 = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index1 = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/multi-index-1"),
             VectorSimilarityFunctions.EUCLIDEAN,
             mock(org.neo4j.io.fs.FileSystemAbstraction.class)
         );
-        SimpleCuvsIndex index2 = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index2 = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/multi-index-2"),
             VectorSimilarityFunctions.EUCLIDEAN, // Using EUCLIDEAN since COSINE is not available
@@ -152,11 +152,11 @@ public class CuvsIntegrationTest {
         index2.initialize();
 
         // Add different vectors to each
-        List<SimpleCuvsIndex.VectorData> vectors1 = List.of(
-            new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f, 2.0f}, Map.of())
+        List<CagraCuvsIndexImpl.VectorData> vectors1 = List.of(
+            new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f, 2.0f}, Map.of())
         );
-        List<SimpleCuvsIndex.VectorData> vectors2 = List.of(
-            new SimpleCuvsIndex.VectorData(2L, new float[]{3.0f, 4.0f}, Map.of())
+        List<CagraCuvsIndexImpl.VectorData> vectors2 = List.of(
+            new CagraCuvsIndexImpl.VectorData(2L, new float[]{3.0f, 4.0f}, Map.of())
         );
 
         index1.addVectors(vectors1);
@@ -180,7 +180,7 @@ public class CuvsIntegrationTest {
     void shouldHandleReinitialization() throws IOException {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/reinit-test-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -190,8 +190,8 @@ public class CuvsIntegrationTest {
         // When - Initialize, add vectors, close, then reinitialize
         index.initialize();
         
-        List<SimpleCuvsIndex.VectorData> vectors = List.of(
-            new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f, 2.0f}, Map.of())
+        List<CagraCuvsIndexImpl.VectorData> vectors = List.of(
+            new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f, 2.0f}, Map.of())
         );
         index.addVectors(vectors);
         assertEquals(1, index.getStatistics().get("vectorCount"));
@@ -214,7 +214,7 @@ public class CuvsIntegrationTest {
     void shouldHandleVectorDataWithProperties() throws IOException {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/properties-test-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -223,8 +223,8 @@ public class CuvsIntegrationTest {
         index.initialize();
 
         // When - Add vectors with properties
-        List<SimpleCuvsIndex.VectorData> vectors = List.of(
-            new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f, 2.0f}, Map.of(
+        List<CagraCuvsIndexImpl.VectorData> vectors = List.of(
+            new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f, 2.0f}, Map.of(
                 "name", "test-vector",
                 "category", "test",
                 "score", 0.95f
@@ -248,7 +248,7 @@ public class CuvsIntegrationTest {
     void shouldHandleSearchResultsWithProperties() throws IOException {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/search-results-test-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -257,8 +257,8 @@ public class CuvsIntegrationTest {
         index.initialize();
 
         // When - Add vectors and search
-        List<SimpleCuvsIndex.VectorData> vectors = List.of(
-            new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f, 2.0f}, Map.of("name", "vector1"))
+        List<CagraCuvsIndexImpl.VectorData> vectors = List.of(
+            new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f, 2.0f}, Map.of("name", "vector1"))
         );
         index.addVectors(vectors);
 

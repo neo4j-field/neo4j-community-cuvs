@@ -128,7 +128,7 @@ public class CuvsIndexProvider extends IndexProvider {
         // For now, create a simple file system abstraction
         // TODO: Get proper FileSystemAbstraction from context
         FileSystemAbstraction fs = new org.neo4j.io.fs.DefaultFileSystemAbstraction();
-        SimpleCuvsIndex cuvsIndex = createSimpleCuvsIndex(descriptor, fs);
+        CagraCuvsIndexImpl cuvsIndex = createCagraCuvsIndex(descriptor, fs);
         
         // Create ignore strategy for CUVS
         IndexUpdateIgnoreStrategy ignoreStrategy = new CuvsIndexUpdateIgnoreStrategy(version);
@@ -148,7 +148,7 @@ public class CuvsIndexProvider extends IndexProvider {
         
         // Create the CUVS index instance
         FileSystemAbstraction fs = new org.neo4j.io.fs.DefaultFileSystemAbstraction();
-        SimpleCuvsIndex cuvsIndex = createSimpleCuvsIndex(descriptor, fs);
+        CagraCuvsIndexImpl cuvsIndex = createCagraCuvsIndex(descriptor, fs);
         
         // Create the index first
         cuvsIndex.create();
@@ -252,14 +252,14 @@ public class CuvsIndexProvider extends IndexProvider {
     /**
      * Create a SimpleCUVS index instance for the given descriptor.
      */
-    private SimpleCuvsIndex createSimpleCuvsIndex(IndexDescriptor descriptor, FileSystemAbstraction fs) {
+    private CagraCuvsIndexImpl createCagraCuvsIndex(IndexDescriptor descriptor, FileSystemAbstraction fs) {
         // Extract similarity function from descriptor configuration
         VectorSimilarityFunction similarityFunction = extractSimilarityFunction(descriptor);
         
         // Create proper index directory path using the storage factory
         java.nio.file.Path indexDirectory = createIndexDirectory(descriptor);
         
-        return new SimpleCuvsIndex(descriptor, indexDirectory, similarityFunction, fs);
+        return new CagraCuvsIndexImpl(descriptor, indexDirectory, similarityFunction, fs);
     }
     
     /**

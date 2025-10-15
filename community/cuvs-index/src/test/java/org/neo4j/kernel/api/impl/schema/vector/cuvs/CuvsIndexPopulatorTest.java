@@ -49,7 +49,7 @@ public class CuvsIndexPopulatorTest {
     void shouldCreatePopulatorWithValidParameters() {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = mock(SimpleCuvsIndex.class);
+        CagraCuvsIndexImpl index = mock(CagraCuvsIndexImpl.class);
         IndexUpdateIgnoreStrategy ignoreStrategy = mock(IndexUpdateIgnoreStrategy.class);
 
         // When
@@ -63,7 +63,7 @@ public class CuvsIndexPopulatorTest {
     void shouldCreatePopulatingUpdater() {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = mock(SimpleCuvsIndex.class);
+        CagraCuvsIndexImpl index = mock(CagraCuvsIndexImpl.class);
         IndexUpdateIgnoreStrategy ignoreStrategy = mock(IndexUpdateIgnoreStrategy.class);
         CuvsIndexPopulator populator = new CuvsIndexPopulator(index, descriptor, ignoreStrategy);
 
@@ -79,7 +79,7 @@ public class CuvsIndexPopulatorTest {
         // Given
         System.setProperty("cuvs.development.mode", "true");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -110,7 +110,7 @@ public class CuvsIndexPopulatorTest {
     void shouldIgnoreUpdateWhenStrategySaysSo() throws IOException {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = mock(SimpleCuvsIndex.class);
+        CagraCuvsIndexImpl index = mock(CagraCuvsIndexImpl.class);
         IndexUpdateIgnoreStrategy ignoreStrategy = mock(IndexUpdateIgnoreStrategy.class);
         when(ignoreStrategy.ignore(org.mockito.ArgumentMatchers.any(org.neo4j.values.storable.Value[].class))).thenReturn(true);
         
@@ -131,7 +131,7 @@ public class CuvsIndexPopulatorTest {
         // Given
         System.setProperty("cuvs.development.mode", "true");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -172,7 +172,7 @@ public class CuvsIndexPopulatorTest {
     void shouldCloseWithoutAddingVectorsWhenPopulationFailed() throws IOException {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = mock(SimpleCuvsIndex.class);
+        CagraCuvsIndexImpl index = mock(CagraCuvsIndexImpl.class);
         IndexUpdateIgnoreStrategy ignoreStrategy = mock(IndexUpdateIgnoreStrategy.class);
         when(ignoreStrategy.ignore(org.mockito.ArgumentMatchers.any(org.neo4j.values.storable.Value[].class))).thenReturn(false);
         
@@ -194,7 +194,7 @@ public class CuvsIndexPopulatorTest {
     void shouldThrowExceptionWhenAddingAfterClose() throws IOException {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = mock(SimpleCuvsIndex.class);
+        CagraCuvsIndexImpl index = mock(CagraCuvsIndexImpl.class);
         IndexUpdateIgnoreStrategy ignoreStrategy = mock(IndexUpdateIgnoreStrategy.class);
         
         CuvsIndexPopulator populator = new CuvsIndexPopulator(index, descriptor, ignoreStrategy);
@@ -211,7 +211,7 @@ public class CuvsIndexPopulatorTest {
     void shouldThrowExceptionWhenCreatingUpdaterAfterClose() {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = mock(SimpleCuvsIndex.class);
+        CagraCuvsIndexImpl index = mock(CagraCuvsIndexImpl.class);
         IndexUpdateIgnoreStrategy ignoreStrategy = mock(IndexUpdateIgnoreStrategy.class);
         
         CuvsIndexPopulator populator = new CuvsIndexPopulator(index, descriptor, ignoreStrategy);
@@ -226,7 +226,7 @@ public class CuvsIndexPopulatorTest {
     void shouldReturnTrueForSampleCompleted() {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = mock(SimpleCuvsIndex.class);
+        CagraCuvsIndexImpl index = mock(CagraCuvsIndexImpl.class);
         IndexUpdateIgnoreStrategy ignoreStrategy = mock(IndexUpdateIgnoreStrategy.class);
         
         CuvsIndexPopulator populator = new CuvsIndexPopulator(index, descriptor, ignoreStrategy);

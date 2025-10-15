@@ -57,11 +57,11 @@ import org.neo4j.values.storable.Value;
  * CUVS (CUDA Vector Search) index accessor implementation.
  * Provides read and write access to a CUVS index for online operations.
  */
-public class CuvsIndexAccessor extends AbstractCuvsIndexAccessor<CuvsIndexReader, SimpleCuvsIndex> {
+public class CuvsIndexAccessor extends AbstractCuvsIndexAccessor<CuvsIndexReader, CagraCuvsIndexImpl> {
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private volatile boolean closed = false;
 
-    public CuvsIndexAccessor(SimpleCuvsIndex cuvsIndex, IndexDescriptor descriptor, IndexUpdateIgnoreStrategy ignoreStrategy) {
+    public CuvsIndexAccessor(CagraCuvsIndexImpl cuvsIndex, IndexDescriptor descriptor, IndexUpdateIgnoreStrategy ignoreStrategy) {
         super(cuvsIndex, descriptor, ignoreStrategy);
         
         // Try to load existing index from disk
@@ -256,7 +256,7 @@ public class CuvsIndexAccessor extends AbstractCuvsIndexAccessor<CuvsIndexReader
                 return 0; // Index not initialized
             }
             
-            // Get vector count and dimensions from the SimpleCuvsIndex
+            // Get vector count and dimensions from the CagraCuvsIndexImpl
             long vectorCount = cuvsIndex.getVectorCount();
             int dimensions = cuvsIndex.getDimensions();
             
@@ -297,9 +297,9 @@ public class CuvsIndexAccessor extends AbstractCuvsIndexAccessor<CuvsIndexReader
 
     /**
      * Get the underlying CUVS index for direct access if needed.
-     * @return the SimpleCuvsIndex instance
+     * @return the CagraCuvsIndexImpl instance
      */
-    public SimpleCuvsIndex getCuvsIndex() {
+    public CagraCuvsIndexImpl getCuvsIndex() {
         return cuvsIndex;
     }
 
@@ -354,7 +354,7 @@ public class CuvsIndexAccessor extends AbstractCuvsIndexAccessor<CuvsIndexReader
                 for (int i = 0; i < candidate.dimensions(); i++) {
                     vector[i] = candidate.floatElement(i);
                 }
-                var vectorData = new SimpleCuvsIndex.VectorData(entityId, vector, java.util.Map.of());
+                var vectorData = new CagraCuvsIndexImpl.VectorData(entityId, vector, java.util.Map.of());
                 
                 // Use addVector() for incremental updates (not addVectors() for bulk loading)
                 cuvsIndex.addVector(vectorData);

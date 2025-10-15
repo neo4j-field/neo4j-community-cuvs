@@ -81,7 +81,7 @@ class BasicCuvsIndexSettingsValidator implements CuvsIndexSettingsValidator {
             
             if (settings != null) {
                 // For now, we allow all settings to pass validation
-                // The actual validation happens at runtime in SimpleCuvsIndex.validateVectors()
+                // The actual validation happens at runtime in CagraCuvsIndexImpl.validateVectors()
                 // This includes:
                 // - Dimension bounds (1-2048)
                 // - Data quality (no NaN/infinite values)
@@ -95,11 +95,11 @@ class BasicCuvsIndexSettingsValidator implements CuvsIndexSettingsValidator {
             // 1. GPU availability will be checked by GpuDetector.isGpuAvailable()
             // 2. CUDA compatibility will be checked by CuvsNativeLibrary.isAvailable()
             // 3. Memory requirements will be checked by CUVS native library
-            // 4. Vector dimensions will be validated by SimpleCuvsIndex.validateVectors()
+            // 4. Vector dimensions will be validated by CagraCuvsIndexImpl.validateVectors()
             
         } catch (Exception e) {
             // If validation fails, we still allow the index creation
-            // The actual validation happens at runtime in SimpleCuvsIndex
+            // The actual validation happens at runtime in CagraCuvsIndexImpl
             System.out.println("CUVS validator warning: " + e.getMessage());
         }
         

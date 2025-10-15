@@ -53,7 +53,7 @@ public class TieredIndexGpuTest {
         // Given - Disable development mode to use real GPU
         System.setProperty("cuvs.development.mode", "false");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-real-gpu-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -70,10 +70,10 @@ public class TieredIndexGpuTest {
             assertTrue((Boolean) stats.get("gpuAvailable"));
             
             // When - Add vectors with real GPU
-            List<SimpleCuvsIndex.VectorData> vectors = List.of(
-                new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of("gpu", "test")),
-                new SimpleCuvsIndex.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of("gpu", "test")),
-                new SimpleCuvsIndex.VectorData(3L, new float[]{7.0f, 8.0f, 9.0f}, Map.of("gpu", "test"))
+            List<CagraCuvsIndexImpl.VectorData> vectors = List.of(
+                new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of("gpu", "test")),
+                new CagraCuvsIndexImpl.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of("gpu", "test")),
+                new CagraCuvsIndexImpl.VectorData(3L, new float[]{7.0f, 8.0f, 9.0f}, Map.of("gpu", "test"))
             );
             index.addVectors(vectors);
 
@@ -99,7 +99,7 @@ public class TieredIndexGpuTest {
         // Given - Disable development mode
         System.setProperty("cuvs.development.mode", "false");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-real-gpu-incremental-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -110,9 +110,9 @@ public class TieredIndexGpuTest {
             index.initialize();
 
             // When - Add initial vectors
-            List<SimpleCuvsIndex.VectorData> initialVectors = List.of(
-                new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of()),
-                new SimpleCuvsIndex.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of())
+            List<CagraCuvsIndexImpl.VectorData> initialVectors = List.of(
+                new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of()),
+                new CagraCuvsIndexImpl.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of())
             );
             index.addVectors(initialVectors);
 
@@ -121,9 +121,9 @@ public class TieredIndexGpuTest {
             assertEquals(2, statsAfterInitial.get("vectorCount"));
 
             // When - Add incremental vectors with real GPU
-            List<SimpleCuvsIndex.VectorData> incrementalVectors = List.of(
-                new SimpleCuvsIndex.VectorData(3L, new float[]{7.0f, 8.0f, 9.0f}, Map.of()),
-                new SimpleCuvsIndex.VectorData(4L, new float[]{10.0f, 11.0f, 12.0f}, Map.of())
+            List<CagraCuvsIndexImpl.VectorData> incrementalVectors = List.of(
+                new CagraCuvsIndexImpl.VectorData(3L, new float[]{7.0f, 8.0f, 9.0f}, Map.of()),
+                new CagraCuvsIndexImpl.VectorData(4L, new float[]{10.0f, 11.0f, 12.0f}, Map.of())
             );
             index.addVectors(incrementalVectors);
 
@@ -147,7 +147,7 @@ public class TieredIndexGpuTest {
         // Given - Disable development mode
         System.setProperty("cuvs.development.mode", "false");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-real-gpu-large-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -158,13 +158,13 @@ public class TieredIndexGpuTest {
             index.initialize();
 
             // When - Add large dataset (10K vectors)
-            List<SimpleCuvsIndex.VectorData> vectors = new ArrayList<>();
+            List<CagraCuvsIndexImpl.VectorData> vectors = new ArrayList<>();
             for (int i = 0; i < 10000; i++) {
                 float[] vector = new float[128];
                 for (int j = 0; j < 128; j++) {
                     vector[j] = (float) Math.random();
                 }
-                vectors.add(new SimpleCuvsIndex.VectorData(i, vector, Map.of()));
+                vectors.add(new CagraCuvsIndexImpl.VectorData(i, vector, Map.of()));
             }
             
             long startTime = System.currentTimeMillis();
@@ -198,7 +198,7 @@ public class TieredIndexGpuTest {
         // Given - Disable development mode
         System.setProperty("cuvs.development.mode", "false");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-real-gpu-threshold-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -209,13 +209,13 @@ public class TieredIndexGpuTest {
             index.initialize();
 
             // When - Add vectors below threshold (50K)
-            List<SimpleCuvsIndex.VectorData> belowThresholdVectors = new ArrayList<>();
+            List<CagraCuvsIndexImpl.VectorData> belowThresholdVectors = new ArrayList<>();
             for (int i = 0; i < 50000; i++) {
                 float[] vector = new float[16]; // Small dimensions for faster test
                 for (int j = 0; j < 16; j++) {
                     vector[j] = (float) Math.random();
                 }
-                belowThresholdVectors.add(new SimpleCuvsIndex.VectorData(i, vector, Map.of()));
+                belowThresholdVectors.add(new CagraCuvsIndexImpl.VectorData(i, vector, Map.of()));
             }
             index.addVectors(belowThresholdVectors);
 
@@ -224,13 +224,13 @@ public class TieredIndexGpuTest {
             assertEquals(50000, statsBelowThreshold.get("vectorCount"));
 
             // When - Add more vectors to cross threshold (60K more = 110K total)
-            List<SimpleCuvsIndex.VectorData> aboveThresholdVectors = new ArrayList<>();
+            List<CagraCuvsIndexImpl.VectorData> aboveThresholdVectors = new ArrayList<>();
             for (int i = 50000; i < 110000; i++) {
                 float[] vector = new float[16];
                 for (int j = 0; j < 16; j++) {
                     vector[j] = (float) Math.random();
                 }
-                aboveThresholdVectors.add(new SimpleCuvsIndex.VectorData(i, vector, Map.of()));
+                aboveThresholdVectors.add(new CagraCuvsIndexImpl.VectorData(i, vector, Map.of()));
             }
             index.addVectors(aboveThresholdVectors);
 
@@ -251,7 +251,7 @@ public class TieredIndexGpuTest {
         // Given - Force GPU unavailable scenario
         System.setProperty("cuvs.development.mode", "false");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-gpu-fallback-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,

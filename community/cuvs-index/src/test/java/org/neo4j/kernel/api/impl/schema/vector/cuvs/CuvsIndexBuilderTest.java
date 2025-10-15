@@ -87,7 +87,7 @@ public class CuvsIndexBuilderTest {
         );
 
         // When
-        SimpleCuvsIndex index = builder
+        CagraCuvsIndexImpl index = builder
             .withIndexDirectory(indexDirectory)
             .build();
 
@@ -118,7 +118,7 @@ public class CuvsIndexBuilderTest {
         );
 
         // When
-        SimpleCuvsIndex index = builder
+        CagraCuvsIndexImpl index = builder
             .withIndexDirectory(indexDirectory)
             .permanentlyReadOnly()
             .build();
@@ -164,7 +164,7 @@ public class CuvsIndexBuilderTest {
         Path indexDirectory = Paths.get("/tmp/test-index");
 
         // When
-        SimpleCuvsIndex index = CuvsIndexBuilder.create(
+        CagraCuvsIndexImpl index = CuvsIndexBuilder.create(
             descriptor,
             config,
             similarityFunction,

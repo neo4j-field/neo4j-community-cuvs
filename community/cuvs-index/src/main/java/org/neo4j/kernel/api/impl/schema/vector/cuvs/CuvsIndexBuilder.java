@@ -102,13 +102,13 @@ public class CuvsIndexBuilder {
     /**
      * Build the CUVS index.
      *
-     * @return SimpleCuvsIndex instance
+     * @return CagraCuvsIndexImpl instance
      */
-    public SimpleCuvsIndex build() {
+    public CagraCuvsIndexImpl build() {
         if (indexDirectory == null) {
             throw new IllegalStateException("Index directory must be specified");
         }
         
-        return new SimpleCuvsIndex(descriptor, indexDirectory, similarityFunction, fileSystem);
+        return new CagraCuvsIndexImpl(descriptor, indexDirectory, similarityFunction, fileSystem);
     }
 }

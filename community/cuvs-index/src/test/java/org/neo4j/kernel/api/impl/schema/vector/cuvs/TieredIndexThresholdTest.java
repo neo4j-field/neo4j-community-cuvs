@@ -48,7 +48,7 @@ public class TieredIndexThresholdTest {
         // Given
         System.setProperty("cuvs.development.mode", "true");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-brute-force-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -59,13 +59,13 @@ public class TieredIndexThresholdTest {
             index.initialize();
 
             // When - Add vectors below threshold (50K vectors)
-            List<SimpleCuvsIndex.VectorData> vectors = new ArrayList<>();
+            List<CagraCuvsIndexImpl.VectorData> vectors = new ArrayList<>();
             for (int i = 0; i < 50000; i++) {
                 float[] vector = new float[128];
                 for (int j = 0; j < 128; j++) {
                     vector[j] = (float) Math.random();
                 }
-                vectors.add(new SimpleCuvsIndex.VectorData(i, vector, Map.of()));
+                vectors.add(new CagraCuvsIndexImpl.VectorData(i, vector, Map.of()));
             }
             index.addVectors(vectors);
 
@@ -87,7 +87,7 @@ public class TieredIndexThresholdTest {
         // Given
         System.setProperty("cuvs.development.mode", "true");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-threshold-boundary-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -98,13 +98,13 @@ public class TieredIndexThresholdTest {
             index.initialize();
 
             // When - Add exactly 100K vectors (threshold)
-            List<SimpleCuvsIndex.VectorData> vectors = new ArrayList<>();
+            List<CagraCuvsIndexImpl.VectorData> vectors = new ArrayList<>();
             for (int i = 0; i < 100000; i++) {
                 float[] vector = new float[64]; // Smaller dimensions for faster test
                 for (int j = 0; j < 64; j++) {
                     vector[j] = (float) Math.random();
                 }
-                vectors.add(new SimpleCuvsIndex.VectorData(i, vector, Map.of()));
+                vectors.add(new CagraCuvsIndexImpl.VectorData(i, vector, Map.of()));
             }
             index.addVectors(vectors);
 
@@ -126,7 +126,7 @@ public class TieredIndexThresholdTest {
         // Given
         System.setProperty("cuvs.development.mode", "true");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-ann-mode-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -137,13 +137,13 @@ public class TieredIndexThresholdTest {
             index.initialize();
 
             // When - Add vectors above threshold (150K vectors)
-            List<SimpleCuvsIndex.VectorData> vectors = new ArrayList<>();
+            List<CagraCuvsIndexImpl.VectorData> vectors = new ArrayList<>();
             for (int i = 0; i < 150000; i++) {
                 float[] vector = new float[32]; // Small dimensions for faster test
                 for (int j = 0; j < 32; j++) {
                     vector[j] = (float) Math.random();
                 }
-                vectors.add(new SimpleCuvsIndex.VectorData(i, vector, Map.of()));
+                vectors.add(new CagraCuvsIndexImpl.VectorData(i, vector, Map.of()));
             }
             index.addVectors(vectors);
 
@@ -165,7 +165,7 @@ public class TieredIndexThresholdTest {
         // Given
         System.setProperty("cuvs.development.mode", "true");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-cross-threshold-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -176,13 +176,13 @@ public class TieredIndexThresholdTest {
             index.initialize();
 
             // When - Start below threshold (50K vectors)
-            List<SimpleCuvsIndex.VectorData> initialVectors = new ArrayList<>();
+            List<CagraCuvsIndexImpl.VectorData> initialVectors = new ArrayList<>();
             for (int i = 0; i < 50000; i++) {
                 float[] vector = new float[16]; // Very small dimensions for faster test
                 for (int j = 0; j < 16; j++) {
                     vector[j] = (float) Math.random();
                 }
-                initialVectors.add(new SimpleCuvsIndex.VectorData(i, vector, Map.of()));
+                initialVectors.add(new CagraCuvsIndexImpl.VectorData(i, vector, Map.of()));
             }
             index.addVectors(initialVectors);
 
@@ -191,13 +191,13 @@ public class TieredIndexThresholdTest {
             assertEquals(50000, statsAfterInitial.get("vectorCount"));
 
             // When - Add more vectors to cross threshold (60K more = 110K total)
-            List<SimpleCuvsIndex.VectorData> additionalVectors = new ArrayList<>();
+            List<CagraCuvsIndexImpl.VectorData> additionalVectors = new ArrayList<>();
             for (int i = 50000; i < 110000; i++) {
                 float[] vector = new float[16];
                 for (int j = 0; j < 16; j++) {
                     vector[j] = (float) Math.random();
                 }
-                additionalVectors.add(new SimpleCuvsIndex.VectorData(i, vector, Map.of()));
+                additionalVectors.add(new CagraCuvsIndexImpl.VectorData(i, vector, Map.of()));
             }
             index.addVectors(additionalVectors);
 
@@ -219,7 +219,7 @@ public class TieredIndexThresholdTest {
         // Given
         System.setProperty("cuvs.development.mode", "true");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-performance-threshold-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -233,26 +233,26 @@ public class TieredIndexThresholdTest {
             long totalStartTime = System.currentTimeMillis();
             
             // Batch 1: Below threshold (30K)
-            List<SimpleCuvsIndex.VectorData> batch1 = new ArrayList<>();
+            List<CagraCuvsIndexImpl.VectorData> batch1 = new ArrayList<>();
             for (int i = 0; i < 30000; i++) {
                 float[] vector = new float[8]; // Very small for speed
                 for (int j = 0; j < 8; j++) {
                     vector[j] = (float) Math.random();
                 }
-                batch1.add(new SimpleCuvsIndex.VectorData(i, vector, Map.of()));
+                batch1.add(new CagraCuvsIndexImpl.VectorData(i, vector, Map.of()));
             }
             long batch1Start = System.currentTimeMillis();
             index.addVectors(batch1);
             long batch1Time = System.currentTimeMillis() - batch1Start;
             
             // Batch 2: Cross threshold (80K more = 110K total)
-            List<SimpleCuvsIndex.VectorData> batch2 = new ArrayList<>();
+            List<CagraCuvsIndexImpl.VectorData> batch2 = new ArrayList<>();
             for (int i = 30000; i < 110000; i++) {
                 float[] vector = new float[8];
                 for (int j = 0; j < 8; j++) {
                     vector[j] = (float) Math.random();
                 }
-                batch2.add(new SimpleCuvsIndex.VectorData(i, vector, Map.of()));
+                batch2.add(new CagraCuvsIndexImpl.VectorData(i, vector, Map.of()));
             }
             long batch2Start = System.currentTimeMillis();
             index.addVectors(batch2);

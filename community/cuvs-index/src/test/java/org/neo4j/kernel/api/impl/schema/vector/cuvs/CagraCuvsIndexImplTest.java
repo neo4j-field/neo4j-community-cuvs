@@ -44,7 +44,7 @@ import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.api.index.ValueIndexReader;
 import org.neo4j.internal.schema.IndexPrototype;
 
-public class SimpleCuvsIndexTest {
+public class CagraCuvsIndexImplTest {
 
     @Test
     void shouldInitializeInDevelopmentMode() {

@@ -29,11 +29,30 @@ public class CuvsNativeLibrary {
     static {
         boolean available = false;
         try {
-            System.loadLibrary("cuvs");
-            available = true;
-            // CUVS native library loaded successfully
-        } catch (UnsatisfiedLinkError e) {
-            // CUVS native library not available: e.getMessage()
+            // Try to load CUVS library from conda environment first
+            String condaPath = System.getenv("CONDA_PREFIX");
+            if (condaPath != null) {
+                try {
+                    System.load(condaPath + "/lib/libcuvs.so");
+                    available = true;
+                    System.out.println("CUVS native library loaded from conda: " + condaPath + "/lib/libcuvs.so");
+                } catch (UnsatisfiedLinkError e) {
+                    System.out.println("Failed to load CUVS from conda: " + e.getMessage());
+                }
+            }
+            
+            // If conda loading failed, try system library path
+            if (!available) {
+                try {
+                    System.loadLibrary("cuvs");
+                    available = true;
+                    System.out.println("CUVS native library loaded from system path");
+                } catch (UnsatisfiedLinkError e) {
+                    System.out.println("Failed to load CUVS from system path: " + e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("CUVS native library not available: " + e.getMessage());
         }
         CUVS_AVAILABLE = available;
     }
@@ -57,9 +76,9 @@ public class CuvsNativeLibrary {
         
         try {
             // According to the API reference, version is not exposed through public API
-            // The current version is 25.10.0 but we can't access it directly
+            // The current version is 25.08.0 but we can't access it directly
             // Return a placeholder version
-            return "25.10.0"; // Current CUVS version
+            return "25.08.0"; // Current CUVS version
         } catch (Exception e) {
             return "unknown";
         }

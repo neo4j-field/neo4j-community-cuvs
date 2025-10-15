@@ -47,7 +47,7 @@ public class TieredIndexConfigurationTest {
         // Given
         System.setProperty("cuvs.development.mode", "true");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-default-config-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -58,9 +58,9 @@ public class TieredIndexConfigurationTest {
             index.initialize();
 
             // When - Add vectors
-            List<SimpleCuvsIndex.VectorData> vectors = List.of(
-                new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of()),
-                new SimpleCuvsIndex.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of())
+            List<CagraCuvsIndexImpl.VectorData> vectors = List.of(
+                new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of()),
+                new CagraCuvsIndexImpl.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of())
             );
             index.addVectors(vectors);
 
@@ -92,7 +92,7 @@ public class TieredIndexConfigurationTest {
         };
         
         for (VectorSimilarityFunction similarityFunction : similarityFunctions) {
-            SimpleCuvsIndex index = new SimpleCuvsIndex(
+            CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
                 descriptor,
                 Paths.get("/tmp/test-similarity-" + similarityFunction.name().toLowerCase() + "-cuvs-index"),
                 similarityFunction,
@@ -103,9 +103,9 @@ public class TieredIndexConfigurationTest {
                 index.initialize();
 
                 // When - Add vectors
-                List<SimpleCuvsIndex.VectorData> vectors = List.of(
-                    new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of()),
-                    new SimpleCuvsIndex.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of())
+                List<CagraCuvsIndexImpl.VectorData> vectors = List.of(
+                    new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of()),
+                    new CagraCuvsIndexImpl.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of())
                 );
                 index.addVectors(vectors);
 
@@ -132,7 +132,7 @@ public class TieredIndexConfigurationTest {
         int[] dimensions = {8, 16, 32, 64, 128, 256, 512, 1024};
         
         for (int dim : dimensions) {
-            SimpleCuvsIndex index = new SimpleCuvsIndex(
+            CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
                 descriptor,
                 Paths.get("/tmp/test-dimensions-" + dim + "-cuvs-index"),
                 VectorSimilarityFunctions.EUCLIDEAN,
@@ -143,9 +143,9 @@ public class TieredIndexConfigurationTest {
                 index.initialize();
 
                 // When - Add vectors with specific dimensions
-                List<SimpleCuvsIndex.VectorData> vectors = List.of(
-                    new SimpleCuvsIndex.VectorData(1L, createRandomVector(dim), Map.of()),
-                    new SimpleCuvsIndex.VectorData(2L, createRandomVector(dim), Map.of())
+                List<CagraCuvsIndexImpl.VectorData> vectors = List.of(
+                    new CagraCuvsIndexImpl.VectorData(1L, createRandomVector(dim), Map.of()),
+                    new CagraCuvsIndexImpl.VectorData(2L, createRandomVector(dim), Map.of())
                 );
                 index.addVectors(vectors);
 
@@ -167,7 +167,7 @@ public class TieredIndexConfigurationTest {
         // Given
         System.setProperty("cuvs.development.mode", "true");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-config-persistence-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -178,9 +178,9 @@ public class TieredIndexConfigurationTest {
             index.initialize();
 
             // When - Perform multiple operations
-            List<SimpleCuvsIndex.VectorData> initialVectors = List.of(
-                new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of()),
-                new SimpleCuvsIndex.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of())
+            List<CagraCuvsIndexImpl.VectorData> initialVectors = List.of(
+                new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of()),
+                new CagraCuvsIndexImpl.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of())
             );
             index.addVectors(initialVectors);
 
@@ -191,9 +191,9 @@ public class TieredIndexConfigurationTest {
             assertEquals("EUCLIDEAN", statsAfterInitial.get("similarityFunction"));
 
             // When - Add more vectors
-            List<SimpleCuvsIndex.VectorData> additionalVectors = List.of(
-                new SimpleCuvsIndex.VectorData(3L, new float[]{7.0f, 8.0f, 9.0f}, Map.of()),
-                new SimpleCuvsIndex.VectorData(4L, new float[]{10.0f, 11.0f, 12.0f}, Map.of())
+            List<CagraCuvsIndexImpl.VectorData> additionalVectors = List.of(
+                new CagraCuvsIndexImpl.VectorData(3L, new float[]{7.0f, 8.0f, 9.0f}, Map.of()),
+                new CagraCuvsIndexImpl.VectorData(4L, new float[]{10.0f, 11.0f, 12.0f}, Map.of())
             );
             index.addVectors(additionalVectors);
 
@@ -214,7 +214,7 @@ public class TieredIndexConfigurationTest {
         // Given
         System.setProperty("cuvs.development.mode", "true");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-config-validation-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -225,10 +225,10 @@ public class TieredIndexConfigurationTest {
             index.initialize();
 
             // When - Add vectors with consistent dimensions
-            List<SimpleCuvsIndex.VectorData> vectors = List.of(
-                new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of()),
-                new SimpleCuvsIndex.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of()),
-                new SimpleCuvsIndex.VectorData(3L, new float[]{7.0f, 8.0f, 9.0f}, Map.of())
+            List<CagraCuvsIndexImpl.VectorData> vectors = List.of(
+                new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of()),
+                new CagraCuvsIndexImpl.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of()),
+                new CagraCuvsIndexImpl.VectorData(3L, new float[]{7.0f, 8.0f, 9.0f}, Map.of())
             );
             index.addVectors(vectors);
 
@@ -254,7 +254,7 @@ public class TieredIndexConfigurationTest {
         IndexDescriptor descriptor = createTestDescriptor();
         
         // Test edge cases
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-edge-case-config-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -265,8 +265,8 @@ public class TieredIndexConfigurationTest {
             index.initialize();
 
             // When - Add single vector (minimum case)
-            List<SimpleCuvsIndex.VectorData> singleVector = List.of(
-                new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f}, Map.of())
+            List<CagraCuvsIndexImpl.VectorData> singleVector = List.of(
+                new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f}, Map.of())
             );
             index.addVectors(singleVector);
 

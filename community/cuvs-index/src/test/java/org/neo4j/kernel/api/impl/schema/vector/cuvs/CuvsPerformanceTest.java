@@ -54,7 +54,7 @@ public class CuvsPerformanceTest {
     void shouldHandleLargeNumberOfVectors() throws IOException {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/performance-test-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -63,13 +63,13 @@ public class CuvsPerformanceTest {
         index.initialize();
 
         // When - Add 1000 vectors
-        List<SimpleCuvsIndex.VectorData> vectors = new ArrayList<>();
+        List<CagraCuvsIndexImpl.VectorData> vectors = new ArrayList<>();
         for (int i = 0; i < 1000; i++) {
             float[] vector = new float[128];
             for (int j = 0; j < 128; j++) {
                 vector[j] = (float) Math.random();
             }
-            vectors.add(new SimpleCuvsIndex.VectorData(i, vector, Map.of()));
+            vectors.add(new CagraCuvsIndexImpl.VectorData(i, vector, Map.of()));
         }
 
         long startTime = System.currentTimeMillis();
@@ -95,7 +95,7 @@ public class CuvsPerformanceTest {
     void shouldHandleConcurrentOperations() throws Exception {
         // Given
         IndexDescriptor descriptor = null;
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/concurrent-test-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -111,13 +111,13 @@ public class CuvsPerformanceTest {
             final int threadNum = threadId;
             Future<?> future = executor.submit(() -> {
                 try {
-                    List<SimpleCuvsIndex.VectorData> vectors = new ArrayList<>();
+                    List<CagraCuvsIndexImpl.VectorData> vectors = new ArrayList<>();
                     for (int i = 0; i < 100; i++) {
                         float[] vector = new float[64];
                         for (int j = 0; j < 64; j++) {
                             vector[j] = (float) Math.random();
                         }
-                        vectors.add(new SimpleCuvsIndex.VectorData(
+                        vectors.add(new CagraCuvsIndexImpl.VectorData(
                             threadNum * 100 + i, vector, Map.of()
                         ));
                     }
@@ -149,7 +149,7 @@ public class CuvsPerformanceTest {
     void shouldHandleMultipleSearchOperations() throws IOException {
         // Given
         IndexDescriptor descriptor = null;
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/search-test-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -158,13 +158,13 @@ public class CuvsPerformanceTest {
         index.initialize();
 
         // Add some vectors first
-        List<SimpleCuvsIndex.VectorData> vectors = new ArrayList<>();
+        List<CagraCuvsIndexImpl.VectorData> vectors = new ArrayList<>();
         for (int i = 0; i < 100; i++) {
             float[] vector = new float[32];
             for (int j = 0; j < 32; j++) {
                 vector[j] = (float) Math.random();
             }
-            vectors.add(new SimpleCuvsIndex.VectorData(i, vector, Map.of()));
+            vectors.add(new CagraCuvsIndexImpl.VectorData(i, vector, Map.of()));
         }
         index.addVectors(vectors);
 
@@ -193,7 +193,7 @@ public class CuvsPerformanceTest {
     void shouldHandleHighDimensionalVectors() throws IOException {
         // Given
         IndexDescriptor descriptor = null;
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/high-dim-test-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -202,13 +202,13 @@ public class CuvsPerformanceTest {
         index.initialize();
 
         // When - Add vectors with high dimensions (1024)
-        List<SimpleCuvsIndex.VectorData> vectors = new ArrayList<>();
+        List<CagraCuvsIndexImpl.VectorData> vectors = new ArrayList<>();
         for (int i = 0; i < 50; i++) {
             float[] vector = new float[1024];
             for (int j = 0; j < 1024; j++) {
                 vector[j] = (float) Math.random();
             }
-            vectors.add(new SimpleCuvsIndex.VectorData(i, vector, Map.of()));
+            vectors.add(new CagraCuvsIndexImpl.VectorData(i, vector, Map.of()));
         }
 
         long startTime = System.currentTimeMillis();
@@ -233,7 +233,7 @@ public class CuvsPerformanceTest {
     void shouldHandleMemoryEfficiently() throws IOException {
         // Given
         IndexDescriptor descriptor = null;
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/memory-test-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -245,13 +245,13 @@ public class CuvsPerformanceTest {
 
         // When - Add vectors in batches
         for (int batch = 0; batch < 10; batch++) {
-            List<SimpleCuvsIndex.VectorData> vectors = new ArrayList<>();
+            List<CagraCuvsIndexImpl.VectorData> vectors = new ArrayList<>();
             for (int i = 0; i < 100; i++) {
                 float[] vector = new float[256];
                 for (int j = 0; j < 256; j++) {
                     vector[j] = (float) Math.random();
                 }
-                vectors.add(new SimpleCuvsIndex.VectorData(batch * 100 + i, vector, Map.of()));
+                vectors.add(new CagraCuvsIndexImpl.VectorData(batch * 100 + i, vector, Map.of()));
             }
             index.addVectors(vectors);
         }

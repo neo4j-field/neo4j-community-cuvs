@@ -52,7 +52,7 @@ public class CuvsIndexReaderTest {
         // Given
         System.setProperty("cuvs.development.mode", "true");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -63,9 +63,9 @@ public class CuvsIndexReaderTest {
             index.initialize();
             
             // Add some test vectors
-            List<SimpleCuvsIndex.VectorData> vectors = List.of(
-                new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of()),
-                new SimpleCuvsIndex.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of())
+            List<CagraCuvsIndexImpl.VectorData> vectors = List.of(
+                new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of()),
+                new CagraCuvsIndexImpl.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of())
             );
             index.addVectors(vectors);
 
@@ -88,7 +88,7 @@ public class CuvsIndexReaderTest {
     void shouldRejectNonNearestNeighborsQuery() {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = mock(SimpleCuvsIndex.class);
+        CagraCuvsIndexImpl index = mock(CagraCuvsIndexImpl.class);
         CuvsIndexReader reader = new CuvsIndexReader(
             descriptor,
             mock(IndexUsageTracking.class),
@@ -114,7 +114,7 @@ public class CuvsIndexReaderTest {
     void shouldRejectCompositeQueries() {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = mock(SimpleCuvsIndex.class);
+        CagraCuvsIndexImpl index = mock(CagraCuvsIndexImpl.class);
         CuvsIndexReader reader = new CuvsIndexReader(
             descriptor,
             mock(IndexUsageTracking.class),
@@ -140,7 +140,7 @@ public class CuvsIndexReaderTest {
     void shouldValidateVectorDimensions() {
         // Given
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = mock(SimpleCuvsIndex.class);
+        CagraCuvsIndexImpl index = mock(CagraCuvsIndexImpl.class);
         CuvsIndexReader reader = new CuvsIndexReader(
             descriptor,
             mock(IndexUsageTracking.class),
@@ -168,7 +168,7 @@ public class CuvsIndexReaderTest {
         // Given
         System.setProperty("cuvs.development.mode", "true");
         IndexDescriptor descriptor = createTestDescriptor();
-        SimpleCuvsIndex index = new SimpleCuvsIndex(
+        CagraCuvsIndexImpl index = new CagraCuvsIndexImpl(
             descriptor,
             Paths.get("/tmp/test-cuvs-index"),
             VectorSimilarityFunctions.EUCLIDEAN,
@@ -179,9 +179,9 @@ public class CuvsIndexReaderTest {
             index.initialize();
             
             // Add some test vectors
-            List<SimpleCuvsIndex.VectorData> vectors = List.of(
-                new SimpleCuvsIndex.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of()),
-                new SimpleCuvsIndex.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of())
+            List<CagraCuvsIndexImpl.VectorData> vectors = List.of(
+                new CagraCuvsIndexImpl.VectorData(1L, new float[]{1.0f, 2.0f, 3.0f}, Map.of()),
+                new CagraCuvsIndexImpl.VectorData(2L, new float[]{4.0f, 5.0f, 6.0f}, Map.of())
             );
             index.addVectors(vectors);
 

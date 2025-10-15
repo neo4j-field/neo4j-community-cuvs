@@ -20,6 +20,8 @@
 package org.neo4j.kernel.api.impl.schema.vector.cuvs;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -30,6 +32,10 @@ import java.util.Properties;
 import org.neo4j.internal.schema.IndexDescriptor;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.api.vector.VectorSimilarityFunction;
+
+// CAGRA imports for serialization
+import com.nvidia.cuvs.CagraIndex;
+import com.nvidia.cuvs.CuVSResources;
 
 /**
  * Manages file storage for CUVS indexes.
@@ -280,6 +286,66 @@ public class CuvsIndexStorage {
                 // Directory might not be empty, that's okay
             }
         }
+    }
+    
+    /**
+     * Serializes a CAGRA index to disk.
+     * @param cagraIndex The CAGRA index to serialize
+     * @throws IOException if serialization fails
+     */
+    public void serializeCagraIndex(CagraIndex cagraIndex) throws IOException {
+        if (cagraIndex == null) {
+            throw new IllegalArgumentException("CAGRA index cannot be null");
+        }
+        
+        try (OutputStream outputStream = fileSystem.openAsOutputStream(getIndexDataFile(), false)) {
+            try {
+                cagraIndex.serialize(outputStream);
+                System.out.println("CAGRA index serialized to: " + getIndexDataFile());
+            } catch (Throwable t) {
+                throw new IOException("Failed to serialize CAGRA index: " + t.getMessage(), t);
+            }
+        } catch (Exception e) {
+            throw new IOException("Failed to serialize CAGRA index: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Deserializes a CAGRA index from disk.
+     * @param cuvsResources The CUVS resources for deserialization
+     * @return The deserialized CAGRA index
+     * @throws IOException if deserialization fails
+     */
+    public CagraIndex deserializeCagraIndex(CuVSResources cuvsResources) throws IOException {
+        if (cuvsResources == null) {
+            throw new IllegalArgumentException("CUVS resources cannot be null");
+        }
+        
+        if (!fileSystem.fileExists(getIndexDataFile())) {
+            throw new IOException("CAGRA index file does not exist: " + getIndexDataFile());
+        }
+        
+        try (InputStream inputStream = fileSystem.openAsInputStream(getIndexDataFile())) {
+            try {
+                CagraIndex cagraIndex = CagraIndex.newBuilder(cuvsResources)
+                    .from(inputStream)
+                    .build();
+                System.out.println("CAGRA index deserialized from: " + getIndexDataFile());
+                return cagraIndex;
+            } catch (Throwable t) {
+                throw new IOException("Failed to deserialize CAGRA index: " + t.getMessage(), t);
+            }
+        } catch (Exception e) {
+            throw new IOException("Failed to deserialize CAGRA index: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Checks if a CAGRA index file exists and is valid.
+     * @return true if the index file exists and is readable
+     */
+    public boolean hasCagraIndex() {
+        return fileSystem.fileExists(getIndexDataFile());
     }
     
     /**
