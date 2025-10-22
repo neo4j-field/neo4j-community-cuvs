@@ -67,6 +67,27 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
     private CuVSResources cuvsResources;
     private CagraIndex cuvsIndex;
     
+    // Instance tracking for debugging
+    private static int instanceCounter = 0;
+    private final int instanceId;
+    private final String instanceName;
+    
+    // Debug method to track cuvsIndex changes
+    private void debugCuvsIndexChange(String context, CagraIndex oldValue, CagraIndex newValue) {
+        System.out.println("🔍 CUVS INDEX CHANGE [" + instanceName + "][" + context + "]: " + oldValue + " → " + newValue);
+        if (oldValue != null && newValue == null) {
+            System.out.println("⚠️ WARNING: cuvsIndex set to NULL in " + instanceName + " during " + context);
+            Thread.dumpStack();
+        }
+    }
+    
+    // Override cuvsIndex setter to add debugging
+    private void setCuvsIndex(CagraIndex newValue) {
+        CagraIndex oldValue = this.cuvsIndex;
+        this.cuvsIndex = newValue;
+        debugCuvsIndexChange("setCuvsIndex", oldValue, newValue);
+    }
+    
     // CAGRA configuration
     private CagraIndexParams cagraParams;
     
@@ -83,11 +104,26 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
         this.indexDirectory = indexDirectory;
         this.similarityFunction = similarityFunction;
         
-        System.out.println("CagraCuvsIndexImpl constructor called");
+        // Initialize instance tracking
+        this.instanceId = ++instanceCounter;
+        this.instanceName = "CagraCuvsIndexImpl-" + instanceId + "-" + descriptor.getName();
+        
+        System.out.println("🏗️ " + instanceName + " constructor called");
+        System.out.println("   - Index directory: " + indexDirectory);
+        System.out.println("   - Descriptor: " + descriptor);
         
         // Initialize persistence components
         this.storage = new CuvsIndexStorage(indexDirectory, fileSystem, descriptor);
         this.serializer = new CuvsIndexSerializer(fileSystem);
+        
+        // Create storage directory structure
+        try {
+            this.storage.create();
+            System.out.println("Storage directory created successfully: " + indexDirectory);
+        } catch (IOException e) {
+            System.err.println("Failed to create storage directory: " + e.getMessage());
+            e.printStackTrace();
+        }
         
         // Initialize the index immediately in constructor
         System.out.println("Initializing index in constructor...");
@@ -275,7 +311,7 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
             // In development mode, we skip CUVS initialization
             // The index will work in a limited mode without GPU acceleration
             cuvsResources = null;
-            cuvsIndex = null;
+            setCuvsIndex(null);
             
             // Determine dimensions from descriptor or use default
             int vectorDimensions = 128; // Default dimensions for now
@@ -356,13 +392,13 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
             System.out.println("Using similarity function: " + similarityFunction + " -> CUVS distance type: " + distanceType);
             
                 cagraParams = new CagraIndexParams.Builder()
-                        .withGraphDegree(64)
-                        .withIntermediateGraphDegree(128)
+                        .withGraphDegree(8)   // Even more conservative - minimum viable
+                        .withIntermediateGraphDegree(16)  // Even more conservative
                         .withMetric(distanceType)
                         .build();
             
             // Initialize CAGRA index (will be built when first vectors are added)
-            cuvsIndex = null; // Will be created in addVectorsToIndex
+            setCuvsIndex(null); // Will be created in addVectorsToIndex
             
             isInitialized = true;
             isGpuAvailable = true;
@@ -385,7 +421,8 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
                 } catch (Throwable e) {
                     System.err.println("Error destroying CAGRA index: " + e.getMessage());
                 }
-                cuvsIndex = null;
+                // Don't set cuvsIndex to null here - let the caller decide when to do that
+                // This prevents breaking atomic replacement logic
             }
             if (cuvsResources != null) {
                 cuvsResources.close();
@@ -416,10 +453,10 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
      * @throws IOException if the operation fails
      */
     public void addVectors(List<VectorData> vectorsToAdd) throws IOException {
-        System.out.println("CagraCuvsIndexImpl.addVectors() called with " + vectorsToAdd.size() + " vectors");
-        System.out.println("isInitialized: " + isInitialized);
-        System.out.println("cuvsIndex: " + cuvsIndex);
-        System.out.println("cuvsResources: " + cuvsResources);
+        System.out.println("📥 " + instanceName + ".addVectors() called with " + vectorsToAdd.size() + " vectors");
+        System.out.println("   - isInitialized: " + isInitialized);
+        System.out.println("   - cuvsIndex: " + cuvsIndex);
+        System.out.println("   - cuvsResources: " + cuvsResources);
         lock.writeLock().lock();
         try {
             if (!isInitialized) {
@@ -430,6 +467,15 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
             // Validate vectors before adding them
             validateVectors(vectorsToAdd);
 
+            // CRITICAL FIX: Add vectors to the list BEFORE calling addVectorsToIndex
+            // This ensures that addVectorsToIndex can see the existing vectors
+            vectors.addAll(vectorsToAdd);
+            vectorCount += vectorsToAdd.size();
+            
+            if (vectorsToAdd.size() > 0) {
+                dimensions = vectorsToAdd.get(0).getVector().length;
+            }
+
             // Check if we have CUVS resources (GPU mode) vs development mode
             if (cuvsResources != null) {
                 System.out.println("GPU mode: cuvsResources available, calling addVectorsToIndex");
@@ -437,13 +483,6 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
             } else {
                 // Development mode - just track vectors in memory
                 System.out.println("Development mode: Tracking vectors in memory only");
-            }
-
-            vectors.addAll(vectorsToAdd);
-            vectorCount += vectorsToAdd.size();
-            
-            if (vectorsToAdd.size() > 0) {
-                dimensions = vectorsToAdd.get(0).getVector().length;
             }
         } finally {
             lock.writeLock().unlock();
@@ -541,12 +580,12 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
                 vectorCount++;
             } else {
                 // Fallback: rebuild the index with the new vector
-                List<VectorData> allVectors = new ArrayList<>(vectors);
-                allVectors.add(vectorData);
-                
-                addVectorsToIndex(allVectors);
+                // CRITICAL FIX: Add vector to list BEFORE calling addVectorsToIndex
                 vectors.add(vectorData);
                 vectorCount++;
+                
+                List<VectorData> allVectors = new ArrayList<>(vectors);
+                addVectorsToIndex(allVectors);
             }
             
             if (dimensions == 0) {
@@ -559,41 +598,115 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
 
     private void addVectorsToIndex(List<VectorData> vectorsToAdd) throws IOException {
         try {
+            System.out.println("🔧 addVectorsToIndex called with " + vectorsToAdd.size() + " new vectors");
+            System.out.println("📊 Current stored vectors: " + vectors.size());
+            
             // CAGRA doesn't support incremental updates, so we need to rebuild the entire index
             // Combine all existing vectors with the new ones
             List<VectorData> allVectors = new ArrayList<>(vectors);
             allVectors.addAll(vectorsToAdd);
-            
+
             int vectorCount = allVectors.size();
             int vectorDimensions = allVectors.get(0).getVector().length;
             
+            System.out.println("📈 Total vectors for CAGRA build: " + vectorCount);
+            System.out.println("📏 Vector dimensions: " + vectorDimensions);
+
             // Create a matrix to hold all vectors
             float[][] matrixData = new float[vectorCount][vectorDimensions];
             for (int i = 0; i < vectorCount; i++) {
                 matrixData[i] = allVectors.get(i).getVector();
             }
             
-            // Destroy existing index if it exists
-            if (cuvsIndex != null) {
-                try {
-                    cuvsIndex.destroyIndex();
-                } catch (Throwable e) {
-                    System.err.println("Error destroying existing CAGRA index: " + e.getMessage());
-                }
-                cuvsIndex = null;
-            }
+            System.out.println("✅ Matrix created: " + matrixData.length + " x " + matrixData[0].length);
             
-            // Build new CAGRA index with all vectors
+            // ATOMIC INDEX REPLACEMENT: Build new index before destroying old one
+            CagraIndex oldIndex = cuvsIndex;
+            CagraIndex newIndex = null;
+            
             try {
-                cuvsIndex = CagraIndex.newBuilder(cuvsResources)
-                        .withDataset(CuVSMatrix.ofArray(matrixData))
-                        .withIndexParams(cagraParams)
-                        .build();
-                System.out.println("Built CAGRA index with " + vectorCount + " vectors (dimensions: " + vectorDimensions + ")");
+                // Build new CAGRA index with all vectors
+                System.out.println("🚀 Starting CAGRA index build...");
+                System.out.println("📊 Dataset: " + vectorCount + " vectors × " + vectorDimensions + " dimensions");
+                System.out.println("⚙️ CAGRA params: graphDegree=" + cagraParams.getGraphDegree() + 
+                                 ", intermediateGraphDegree=" + cagraParams.getIntermediateGraphDegree());
                 
+                System.out.println("Creating CuVSMatrix with " + vectorCount + " vectors of " + vectorDimensions + " dimensions");
+                
+                // Validate matrix data before creating CuVSMatrix
+                for (int i = 0; i < Math.min(3, vectorCount); i++) {
+                    System.out.println("Vector " + i + " first 3 values: " + 
+                        matrixData[i][0] + ", " + matrixData[i][1] + ", " + matrixData[i][2]);
+                }
+                
+                // CAGRA works better with more vectors
+                System.out.println("📊 Building CAGRA index with " + vectorCount + " vectors (CAGRA will auto-adjust parameters)");
+                
+                // For testing purposes, let's use larger datasets
+                if (vectorCount < 100) {
+                    System.out.println("⚠️ Small dataset (" + vectorCount + " vectors) - CAGRA prefers larger datasets");
+                    System.out.println("💡 Consider using 100+ vectors for optimal CAGRA performance");
+                } else if (vectorCount >= 1000) {
+                    System.out.println("🎉 Large dataset (" + vectorCount + " vectors) - Perfect for CAGRA!");
+                } else {
+                    System.out.println("✅ Good dataset size (" + vectorCount + " vectors) for CAGRA");
+                }
+                
+                // Don't limit dataset size - let CAGRA handle it
+                System.out.println("🚀 Proceeding with full dataset of " + vectorCount + " vectors");
+                
+                // Try creating CuVSMatrix with explicit row-major layout
+                System.out.println("Creating CuVSMatrix with explicit row-major layout...");
+                CuVSMatrix matrix;
+                try {
+                    // Try the standard approach first
+                    matrix = CuVSMatrix.ofArray(matrixData);
+                    System.out.println("✅ CuVSMatrix created successfully with ofArray()");
+                } catch (Throwable e1) {
+                    System.out.println("⚠️ ofArray() failed: " + e1.getMessage());
+                    try {
+                        // Try creating from flattened array
+                        float[] flattened = new float[vectorCount * vectorDimensions];
+                        for (int i = 0; i < vectorCount; i++) {
+                            System.arraycopy(matrixData[i], 0, flattened, i * vectorDimensions, vectorDimensions);
+                        }
+                        // Create a 2D array from flattened data
+                        float[][] matrixFromFlattened = new float[vectorCount][vectorDimensions];
+                        for (int i = 0; i < vectorCount; i++) {
+                            System.arraycopy(flattened, i * vectorDimensions, matrixFromFlattened[i], 0, vectorDimensions);
+                        }
+                        matrix = CuVSMatrix.ofArray(matrixFromFlattened);
+                        System.out.println("✅ CuVSMatrix created successfully with flattened array");
+                    } catch (Throwable e2) {
+                        System.out.println("❌ Both matrix creation methods failed:");
+                        System.out.println("  ofArray(matrixData): " + e1.getMessage());
+                        System.out.println("  ofArray(flattened): " + e2.getMessage());
+                        throw new IOException("Failed to create CuVSMatrix: " + e1.getMessage(), e1);
+                    }
+                }
+                
+                System.out.println("🔨 Building CAGRA index with CuVS...");
+                System.out.println("📊 Matrix dimensions: " + vectorCount + " × " + vectorDimensions);
+                System.out.println("⚙️ Using CAGRA parameters: " + cagraParams);
+                
+                long startTime = System.currentTimeMillis();
+                setCuvsIndex(CagraIndex.newBuilder(cuvsResources)
+                        .withDataset(matrix)
+                        .withIndexParams(cagraParams)
+                        .build());
+                long buildTime = System.currentTimeMillis() - startTime;
+                
+                System.out.println("🎉 CAGRA index built successfully!");
+                System.out.println("⏱️ Build time: " + buildTime + "ms");
+                System.out.println("📊 Final index: " + vectorCount + " vectors × " + vectorDimensions + " dimensions");
+
+                // ATOMIC REPLACEMENT: Set new index
+                newIndex = cuvsIndex;
+                System.out.println("✅ New CAGRA index ready for atomic replacement");
+
                 // Serialize the CAGRA index to disk for future fast loading
                 try {
-                    storage.serializeCagraIndex(cuvsIndex);
+                    storage.serializeCagraIndex(newIndex);
                     System.out.println("✅ CAGRA index serialized to disk");
                 } catch (Exception e) {
                     System.err.println("⚠️ Failed to serialize CAGRA index (non-critical): " + e.getMessage());
@@ -601,6 +714,17 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
                 }
             } catch (Throwable e) {
                 throw new IOException("Failed to build CAGRA index: " + e.getMessage(), e);
+            }
+            
+            // ATOMIC REPLACEMENT: Only destroy old index after new one is successfully built
+            if (oldIndex != null && newIndex != null) {
+                try {
+                    System.out.println("🗑️ Destroying old CAGRA index after successful replacement...");
+                    oldIndex.destroyIndex();
+                    System.out.println("✅ Old CAGRA index destroyed safely");
+                } catch (Throwable e) {
+                    System.err.println("⚠️ Error destroying old CAGRA index (non-critical): " + e.getMessage());
+                }
             }
         } catch (Exception e) {
             throw new IOException("Failed to add vectors to CUVS index: " + e.getMessage(), e);
@@ -617,6 +741,7 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
     public CagraIndex getCuvsIndex() {
         lock.readLock().lock();
         try {
+            System.out.println("🔍 getCuvsIndex() called - cuvsIndex: " + cuvsIndex + ", isInitialized: " + isInitialized);
             return cuvsIndex;
         } finally {
             lock.readLock().unlock();
@@ -763,6 +888,7 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
      * Load the index state from disk.
      */
     public void load() throws IOException {
+        System.out.println("🔄 load() method called - cuvsIndex before: " + cuvsIndex);
         lock.writeLock().lock();
         try {
             if (isInitialized) {
@@ -823,16 +949,28 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
             // Try to load serialized CAGRA index first
             if (storage.hasCagraIndex()) {
                 try {
-                    System.out.println("Loading serialized CAGRA index from disk");
-                    cuvsIndex = storage.deserializeCagraIndex(cuvsResources);
+                    System.out.println("🔄 Loading serialized CAGRA index from disk");
+                    System.out.println("   - Storage path: " + storage.getIndexDirectory());
+                    System.out.println("   - CAGRA file exists: " + storage.hasCagraIndex());
+                    System.out.println("   - cuvsResources: " + cuvsResources);
+                    
+                    CagraIndex deserializedIndex = storage.deserializeCagraIndex(cuvsResources);
+                    System.out.println("   - Deserialized index: " + deserializedIndex);
+                    
+                    setCuvsIndex(deserializedIndex);
                     System.out.println("✅ CAGRA index loaded successfully from disk!");
+                    System.out.println("   - Final cuvsIndex: " + cuvsIndex);
+                    
                     isInitialized = true;
                     storage.updateState("ONLINE", vectorCount, isGpuAvailable);
                     return;
                 } catch (Exception e) {
-                    System.err.println("Failed to load serialized CAGRA index: " + e.getMessage());
+                    System.err.println("❌ Failed to load serialized CAGRA index: " + e.getMessage());
+                    e.printStackTrace();
                     System.out.println("Falling back to rebuilding index from vector data");
                 }
+            } else {
+                System.out.println("📁 No serialized CAGRA index found, will rebuild from vector data");
             }
             
             // Rebuild index with loaded data
@@ -853,10 +991,10 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
                 // Build the CAGRA index with all loaded vectors
                 try {
                     System.out.println("Building CAGRA index with " + vectorDataList.size() + " vectors, dimensions: " + this.dimensions);
-                    cuvsIndex = CagraIndex.newBuilder(cuvsResources)
+                    setCuvsIndex(CagraIndex.newBuilder(cuvsResources)
                             .withDataset(convertToMatrix(vectorDataList))
                             .withIndexParams(cagraParams)
-                            .build();
+                            .build());
                     
                     System.out.println("✅ CAGRA index rebuild completed successfully!");
                     System.out.println("   - cuvsIndex: " + (cuvsIndex != null ? "created" : "null"));
@@ -884,6 +1022,8 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
             
             // Update state
             storage.updateState("ONLINE", vectorCount, isGpuAvailable);
+            
+            System.out.println("🔄 load() method completed - cuvsIndex after: " + cuvsIndex);
             
         } finally {
             lock.writeLock().unlock();
@@ -926,6 +1066,7 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
             if (isInitialized) {
                 // Clean up CUVS resources
                 cleanupGpuResources();
+                setCuvsIndex(null); // Explicitly set to null after cleanup
                 
                 // Clear local state
                 vectors.clear();
@@ -952,6 +1093,7 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
             // Clean up GPU resources if index is initialized
             if (isInitialized) {
                 cleanupGpuResources();
+                setCuvsIndex(null); // Explicitly set to null after cleanup
             }
             
             // Delete all persisted data
@@ -1009,16 +1151,15 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
      */
     private CagraIndexParams.CuvsDistanceType toCuvsDistanceType(VectorSimilarityFunction similarityFunction) {
         if (similarityFunction == VectorSimilarityFunctions.EUCLIDEAN) {
-            // Neo4j's EUCLIDEAN should map to L2SqrtExpanded (standard Euclidean with square root)
-            // not L2Expanded (squared Euclidean)
-            return CagraIndexParams.CuvsDistanceType.L2SqrtExpanded;
+            // CUVS only supports L2Expanded (squared Euclidean), not L2SqrtExpanded
+            return CagraIndexParams.CuvsDistanceType.L2Expanded;
         } else if (similarityFunction.name().equals("COSINE")) {
             return CagraIndexParams.CuvsDistanceType.CosineExpanded;
         } else if (similarityFunction.name().equals("DOT_PRODUCT")) {
             return CagraIndexParams.CuvsDistanceType.InnerProduct;
         } else {
-            System.out.println("Unknown similarity function: " + similarityFunction + ", defaulting to L2SqrtExpanded");
-            return CagraIndexParams.CuvsDistanceType.L2SqrtExpanded;
+            System.out.println("Unknown similarity function: " + similarityFunction + ", defaulting to L2Expanded");
+            return CagraIndexParams.CuvsDistanceType.L2Expanded;
         }
     }
     
@@ -1057,6 +1198,23 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
     
     @Override
     public CuvsIndexReader getReader() {
+        System.out.println("📖 " + instanceName + ".getReader() called");
+        System.out.println("   - cuvsIndex: " + cuvsIndex);
+        System.out.println("   - isInitialized: " + isInitialized);
+        
+        // CRITICAL FIX: Load the CAGRA index if it's not already loaded
+        if (cuvsIndex == null && cuvsResources != null) {
+            System.out.println("🔧 CAGRA index is null, attempting to load from disk...");
+            try {
+                load();
+                System.out.println("✅ Successfully loaded CAGRA index from disk!");
+                System.out.println("   - cuvsIndex after load: " + cuvsIndex);
+            } catch (Exception e) {
+                System.err.println("❌ Failed to load CAGRA index: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+        
         return new CuvsIndexReader(descriptor, null, this, java.util.OptionalInt.empty());
     }
     
