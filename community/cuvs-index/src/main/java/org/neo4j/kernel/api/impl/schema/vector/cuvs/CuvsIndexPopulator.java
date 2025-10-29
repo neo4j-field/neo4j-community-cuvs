@@ -69,20 +69,27 @@ public class CuvsIndexPopulator implements IndexPopulator {
 
     @Override
     public void close(boolean populationCompletedSuccessfully, CursorContext cursorContext) {
+        System.out.println("🔍 CuvsIndexPopulator.close() called - populationCompletedSuccessfully=" + populationCompletedSuccessfully + ", closed=" + closed + ", pendingVectors.size()=" + pendingVectors.size());
+        
         if (closed) {
+            System.out.println("🔍 CuvsIndexPopulator.close() - Already closed, returning early");
             return;
         }
         
         try {
             if (populationCompletedSuccessfully && !pendingVectors.isEmpty()) {
                 // Batch add all pending vectors to the CUVS index
+                System.out.println("🔍 CuvsIndexPopulator.close() - Adding " + pendingVectors.size() + " vectors to CUVS index");
                 cuvsIndex.addVectors(pendingVectors);
                 pendingVectors.clear();
+            } else {
+                System.out.println("🔍 CuvsIndexPopulator.close() - Not adding vectors: populationCompletedSuccessfully=" + populationCompletedSuccessfully + ", pendingVectors.isEmpty()=" + pendingVectors.isEmpty());
             }
         } catch (IOException e) {
             throw new RuntimeException("Failed to add vectors to CUVS index", e);
         } finally {
             closed = true;
+            System.out.println("🔍 CuvsIndexPopulator.close() - Marked as closed");
         }
     }
 
@@ -93,19 +100,23 @@ public class CuvsIndexPopulator implements IndexPopulator {
     }
 
     public void add(Collection<? extends IndexEntryUpdate<?>> updates, CursorContext cursorContext) {
+        System.out.println("🔍 CuvsIndexPopulator.add(Collection) called with " + updates.size() + " updates");
         for (IndexEntryUpdate<?> update : updates) {
             if (update instanceof ValueIndexEntryUpdate<?> valueUpdate) {
                 add(valueUpdate, cursorContext);
             }
         }
+        System.out.println("🔍 CuvsIndexPopulator.add(Collection) completed - pendingVectors.size()=" + pendingVectors.size());
     }
 
     public void add(ValueIndexEntryUpdate<?> update, CursorContext cursorContext) {
         if (closed) {
+            System.out.println("🔍 CuvsIndexPopulator.add(ValueUpdate) - Populator is closed, throwing exception");
             throw new IllegalStateException("Populator is closed");
         }
         
         if (ignoreStrategy.ignore(update.values())) {
+            System.out.println("🔍 CuvsIndexPopulator.add(ValueUpdate) - Update ignored by strategy, entityId=" + update.getEntityId());
             return;
         }
         
@@ -127,14 +138,23 @@ public class CuvsIndexPopulator implements IndexPopulator {
             );
             
             pendingVectors.add(vectorData);
+            
+            // Enhanced debug logging
+            if (pendingVectors.size() % 100000 == 0) {
+                System.out.println("🔍 CuvsIndexPopulator.add(ValueUpdate) - Processed " + pendingVectors.size() + " vectors, entityId: " + entityId);
+            } else if (pendingVectors.size() <= 10) {
+                System.out.println("🔍 CuvsIndexPopulator.add(ValueUpdate) - Added vector " + pendingVectors.size() + ", entityId: " + entityId);
+            }
+        } else {
+            System.out.println("🔍 CuvsIndexPopulator.add(ValueUpdate) - VectorCandidate is null for entityId=" + entityId);
         }
     }
 
     public void includeSample(IndexEntryUpdate<?> update) {
-        // CUVS doesn't use sampling - just add to pending vectors
-        if (update instanceof ValueIndexEntryUpdate<?> valueUpdate) {
-            add(valueUpdate, null); // CursorContext not needed for this operation
-        }
+        System.out.println("🔍 CuvsIndexPopulator.includeSample() called for entityId=" + update.getEntityId());
+        // CUVS doesn't use sampling - skip processing here since add(Collection) will handle it
+        // This prevents double-counting when both includeSample() and add(Collection) are called
+        System.out.println("🔍 CuvsIndexPopulator.includeSample() - Skipping processing, will be handled by add(Collection)");
     }
 
     public boolean sampleCompleted() {

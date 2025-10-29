@@ -276,8 +276,8 @@ public class CuvsIndexProvider extends IndexProvider {
      */
     private java.nio.file.Path createIndexDirectory(IndexDescriptor descriptor) {
         // Use the storage factory to create proper index directory structure
-        // For now, use a simple path - this would be improved with proper storage factory usage
-        return java.nio.file.Paths.get("/tmp/cuvs-index-" + descriptor.getId());
+        // This ensures the index is stored in the proper Neo4j data directory
+        return directoryStructure().directoryForIndex(descriptor.getId());
     }
 
     @Override

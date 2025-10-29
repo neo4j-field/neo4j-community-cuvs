@@ -22,6 +22,8 @@ package org.neo4j.kernel.api.impl.schema.vector.cuvs;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -32,8 +34,6 @@ import java.util.Properties;
 import org.neo4j.internal.schema.IndexDescriptor;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.api.vector.VectorSimilarityFunction;
-
-// CAGRA imports for serialization
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CuVSResources;
 
@@ -136,6 +136,13 @@ public class CuvsIndexStorage {
      */
     public Path getVectorDataFile() {
         return indexDirectory.resolve(VECTOR_DATA_FILE);
+    }
+    
+    /**
+     * Gets the path to the node ID mapping file.
+     */
+    public Path getMappingDataFile() {
+        return indexDirectory.resolve("node_id_mapping.bin");
     }
     
     /**
@@ -311,6 +318,48 @@ public class CuvsIndexStorage {
     }
     
     /**
+     * Serializes a CAGRA index and its node ID mapping to disk.
+     * @param cagraIndex The CAGRA index to serialize
+     * @param indexToNodeIdMapping The mapping from vector index to node ID
+     * @throws IOException if serialization fails
+     */
+    public void serializeCagraIndexWithMapping(CagraIndex cagraIndex, List<Long> indexToNodeIdMapping) throws IOException {
+        if (cagraIndex == null) {
+            throw new IllegalArgumentException("CAGRA index cannot be null");
+        }
+        if (indexToNodeIdMapping == null) {
+            throw new IllegalArgumentException("Node ID mapping cannot be null");
+        }
+        
+        // Serialize the CAGRA index
+        serializeCagraIndex(cagraIndex);
+        
+        // Serialize the node ID mapping to a separate file
+        try (OutputStream outputStream = fileSystem.openAsOutputStream(getMappingDataFile(), false)) {
+            try (DataOutputStream dataOutput = new DataOutputStream(outputStream)) {
+                // Write header
+                dataOutput.writeInt(0xC0DE0002); // Magic number for mapping file
+                dataOutput.writeInt(1); // Version
+                
+                // Write mapping size
+                dataOutput.writeInt(indexToNodeIdMapping.size());
+                
+                // Write each node ID
+                for (Long nodeId : indexToNodeIdMapping) {
+                    dataOutput.writeLong(nodeId);
+                }
+                
+                System.out.println("✅ Node ID mapping serialized to: " + getMappingDataFile());
+                System.out.println("   - Mapping size: " + indexToNodeIdMapping.size());
+            } catch (Throwable t) {
+                throw new IOException("Failed to serialize node ID mapping: " + t.getMessage(), t);
+            }
+        } catch (Exception e) {
+            throw new IOException("Failed to serialize node ID mapping: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
      * Deserializes a CAGRA index from disk.
      * @param cuvsResources The CUVS resources for deserialization
      * @return The deserialized CAGRA index
@@ -338,6 +387,61 @@ public class CuvsIndexStorage {
         } catch (Exception e) {
             throw new IOException("Failed to deserialize CAGRA index: " + e.getMessage(), e);
         }
+    }
+    
+    /**
+     * Deserializes a CAGRA index and its node ID mapping from disk.
+     * @param cuvsResources The CUVS resources for deserialization
+     * @return A pair containing the deserialized CAGRA index and node ID mapping
+     * @throws IOException if deserialization fails
+     */
+    public java.util.AbstractMap.SimpleEntry<CagraIndex, List<Long>> deserializeCagraIndexWithMapping(CuVSResources cuvsResources) throws IOException {
+        if (cuvsResources == null) {
+            throw new IllegalArgumentException("CUVS resources cannot be null");
+        }
+        
+        // Deserialize the CAGRA index
+        CagraIndex cagraIndex = deserializeCagraIndex(cuvsResources);
+        
+        // Deserialize the node ID mapping
+        List<Long> indexToNodeIdMapping = new ArrayList<>();
+        
+        if (fileSystem.fileExists(getMappingDataFile())) {
+            try (InputStream inputStream = fileSystem.openAsInputStream(getMappingDataFile())) {
+                try (DataInputStream dataInput = new DataInputStream(inputStream)) {
+                    // Read header
+                    int magicNumber = dataInput.readInt();
+                    if (magicNumber != 0xC0DE0002) {
+                        throw new IOException("Invalid magic number in mapping file: " + Integer.toHexString(magicNumber));
+                    }
+                    
+                    int version = dataInput.readInt();
+                    if (version != 1) {
+                        throw new IOException("Unsupported mapping file version: " + version);
+                    }
+                    
+                    // Read mapping size
+                    int mappingSize = dataInput.readInt();
+                    
+                    // Read each node ID
+                    for (int i = 0; i < mappingSize; i++) {
+                        long nodeId = dataInput.readLong();
+                        indexToNodeIdMapping.add(nodeId);
+                    }
+                    
+                    System.out.println("✅ Node ID mapping deserialized from: " + getMappingDataFile());
+                    System.out.println("   - Mapping size: " + indexToNodeIdMapping.size());
+                } catch (Throwable t) {
+                    throw new IOException("Failed to deserialize node ID mapping: " + t.getMessage(), t);
+                }
+            } catch (Exception e) {
+                throw new IOException("Failed to deserialize node ID mapping: " + e.getMessage(), e);
+            }
+        } else {
+            System.out.println("⚠️ No mapping file found, will rebuild mapping from vector data");
+        }
+        
+        return new java.util.AbstractMap.SimpleEntry<>(cagraIndex, indexToNodeIdMapping);
     }
     
     /**

@@ -63,6 +63,9 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
     private int dimensions = 0;
     private final List<VectorData> vectors = new ArrayList<>();
     
+    // Mapping from vector index (position in CUVS matrix) to Neo4j node ID
+    private final List<Long> indexToNodeIdMapping = new ArrayList<>();
+    
     // Real NVIDIA CUVS Java API resources
     private CuVSResources cuvsResources;
     private CagraIndex cuvsIndex;
@@ -107,6 +110,11 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
         // Initialize instance tracking
         this.instanceId = ++instanceCounter;
         this.instanceName = "CagraCuvsIndexImpl-" + instanceId + "-" + descriptor.getName();
+        
+        // CRITICAL FIX: Clear vectors list to prevent accumulation across different index creations
+        this.vectors.clear();
+        this.vectorCount = 0;
+        System.out.println("🧹 Cleared vectors list and reset vectorCount for new index creation");
         
         System.out.println("🏗️ " + instanceName + " constructor called");
         System.out.println("   - Index directory: " + indexDirectory);
@@ -166,6 +174,9 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
     @Override
     protected void doOpen() throws IOException {
         System.out.println("CagraCuvsIndexImpl.doOpen() called");
+        System.out.println("   - isInitialized: " + isInitialized);
+        System.out.println("   - cuvsIndex: " + cuvsIndex);
+        System.out.println("   - hasPersistedData(): " + hasPersistedData());
         lock.writeLock().lock();
         try {
             if (isInitialized) {
@@ -205,25 +216,10 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
             throw new IllegalStateException("Index not initialized");
         }
         
-        // Get dimensions from the index descriptor or use default
-        java.util.OptionalInt dimensions = java.util.OptionalInt.empty();
+        // Get dimensions from the index descriptor using our helper method
+        java.util.OptionalInt dimensions = getDimensionsFromDescriptor();
         
-        // Extract dimensions from index config
-        try {
-            Map<String, org.neo4j.values.storable.Value> config = descriptor.getIndexConfig().asMap();
-            if (config.containsKey("vector.dimensions")) {
-                org.neo4j.values.storable.Value dimValue = config.get("vector.dimensions");
-                if (dimValue instanceof org.neo4j.values.storable.IntValue) {
-                    int dims = ((org.neo4j.values.storable.IntValue) dimValue).value();
-                    dimensions = java.util.OptionalInt.of(dims);
-                }
-            }
-        } catch (Exception e) {
-            // If we can't extract dimensions, use empty OptionalInt
-            dimensions = java.util.OptionalInt.empty();
-        }
-        
-        return new CuvsIndexReader(descriptor, usageTracker, this, dimensions);
+        return new CuvsIndexReader(descriptor, usageTracker, this, dimensions, similarityFunction);
     }
 
 
@@ -248,11 +244,13 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
      * @throws GpuUnavailableException if GPU resources are not available
      */
     public void initialize() {
-        System.out.println("CagraCuvsIndexImpl.initialize() called");
+        System.out.println("🚀 CagraCuvsIndexImpl.initialize() called for: " + instanceName);
+        System.out.println("   - Thread: " + Thread.currentThread().getName());
+        System.out.println("   - Current time: " + System.currentTimeMillis());
         lock.writeLock().lock();
         try {
             if (isInitialized) {
-                System.out.println("Already initialized, returning");
+                System.out.println("✅ Already initialized, returning");
                 return;
             }
             
@@ -359,6 +357,11 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
      * @return the vector dimensions, or default to 384 if not specified
      */
     private int getVectorDimensionsFromConfig() {
+        // Use cached dimensions if available
+        if (this.dimensions > 0) {
+            return this.dimensions;
+        }
+        
         try {
             Map<String, org.neo4j.values.storable.Value> config = descriptor.getIndexConfig().asMap();
             if (config.containsKey("vector.dimensions")) {
@@ -366,6 +369,7 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
                 if (dimValue instanceof org.neo4j.values.storable.IntValue) {
                     int dims = ((org.neo4j.values.storable.IntValue) dimValue).value();
                     System.out.println("Using vector dimensions from config: " + dims);
+                    this.dimensions = dims; // Cache the result
                     return dims;
                 }
             }
@@ -375,7 +379,29 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
         
         // Default fallback
         System.out.println("Using default vector dimensions: 384");
+        this.dimensions = 384; // Cache the result
         return 384;
+    }
+
+    /**
+     * Get vector dimensions from the index descriptor configuration.
+     * This is the single source of truth for dimensions.
+     * @return the vector dimensions from the index config as OptionalInt
+     */
+    private java.util.OptionalInt getDimensionsFromDescriptor() {
+        try {
+            Map<String, org.neo4j.values.storable.Value> config = descriptor.getIndexConfig().asMap();
+            if (config.containsKey("vector.dimensions")) {
+                org.neo4j.values.storable.Value dimValue = config.get("vector.dimensions");
+                if (dimValue instanceof org.neo4j.values.storable.IntValue) {
+                    int dims = ((org.neo4j.values.storable.IntValue) dimValue).value();
+                    return java.util.OptionalInt.of(dims);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Could not extract dimensions from descriptor: " + e.getMessage());
+        }
+        return java.util.OptionalInt.empty();
     }
 
     private void initializeGpuIndex() {
@@ -457,6 +483,21 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
         System.out.println("   - isInitialized: " + isInitialized);
         System.out.println("   - cuvsIndex: " + cuvsIndex);
         System.out.println("   - cuvsResources: " + cuvsResources);
+        
+        // DEBUG: Simple investigation - what entity IDs are we getting?
+        if (!vectorsToAdd.isEmpty()) {
+                System.out.println("   - First 5 entity IDs: " + vectorsToAdd.stream().limit(5).map(v -> v.getNodeId()).collect(java.util.stream.Collectors.toList()));
+                System.out.println("   - Last 5 entity IDs: " + vectorsToAdd.stream().skip(Math.max(0, vectorsToAdd.size() - 5)).map(v -> v.getNodeId()).collect(java.util.stream.Collectors.toList()));
+            System.out.println("   - Call stack: " + Thread.currentThread().getStackTrace()[2].getClassName() + "." + Thread.currentThread().getStackTrace()[2].getMethodName());
+        }
+        
+        // DEBUG: Print call stack to see where this is being called from
+        System.out.println("   - Call stack:");
+        StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+        for (int i = 0; i < Math.min(5, stack.length); i++) {
+            System.out.println("     " + i + ": " + stack[i].getClassName() + "." + stack[i].getMethodName() + ":" + stack[i].getLineNumber());
+        }
+        
         lock.writeLock().lock();
         try {
             if (!isInitialized) {
@@ -467,19 +508,10 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
             // Validate vectors before adding them
             validateVectors(vectorsToAdd);
 
-            // CRITICAL FIX: Add vectors to the list BEFORE calling addVectorsToIndex
-            // This ensures that addVectorsToIndex can see the existing vectors
-            vectors.addAll(vectorsToAdd);
-            vectorCount += vectorsToAdd.size();
-            
-            if (vectorsToAdd.size() > 0) {
-                dimensions = vectorsToAdd.get(0).getVector().length;
-            }
-
             // Check if we have CUVS resources (GPU mode) vs development mode
             if (cuvsResources != null) {
                 System.out.println("GPU mode: cuvsResources available, calling addVectorsToIndex");
-                addVectorsToIndex(vectorsToAdd);
+                addVectorsToIndex(vectorsToAdd, true); // true = population
             } else {
                 // Development mode - just track vectors in memory
                 System.out.println("Development mode: Tracking vectors in memory only");
@@ -508,6 +540,16 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
             }
             
             int vectorDimensions = vector.getVector().length;
+            int expectedDimensions = getVectorDimensionsFromConfig();
+            
+            // Validate dimensions match the index configuration
+            if (vectorDimensions != expectedDimensions) {
+                throw new IllegalArgumentException(
+                    "Vector dimensions mismatch: expected " + expectedDimensions + 
+                    " (from index config), got " + vectorDimensions + 
+                    " for node: " + vector.getNodeId()
+                );
+            }
             
             // CUVS dimension validation: 1-2048 dimensions
             if (vectorDimensions < 1) {
@@ -585,7 +627,7 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
                 vectorCount++;
                 
                 List<VectorData> allVectors = new ArrayList<>(vectors);
-                addVectorsToIndex(allVectors);
+                addVectorsToIndex(allVectors, false); // false = incremental update
             }
             
             if (dimensions == 0) {
@@ -596,29 +638,60 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
         }
     }
 
-    private void addVectorsToIndex(List<VectorData> vectorsToAdd) throws IOException {
+    private void addVectorsToIndex(List<VectorData> vectorsToAdd, boolean isPopulation) throws IOException {
         try {
-            System.out.println("🔧 addVectorsToIndex called with " + vectorsToAdd.size() + " new vectors");
+            System.out.println("🔧 addVectorsToIndex called with " + vectorsToAdd.size() + " vectors (isPopulation=" + isPopulation + ")");
             System.out.println("📊 Current stored vectors: " + vectors.size());
             
-            // CAGRA doesn't support incremental updates, so we need to rebuild the entire index
-            // Combine all existing vectors with the new ones
-            List<VectorData> allVectors = new ArrayList<>(vectors);
-            allVectors.addAll(vectorsToAdd);
-
-            int vectorCount = allVectors.size();
-            int vectorDimensions = allVectors.get(0).getVector().length;
+            // CAGRA doesn't support incremental updates, so we rebuild the entire index
+            int vectorCount;
+            if (isPopulation) {
+                // During population: vectorsToAdd contains only the new vectors
+                vectorCount = vectorsToAdd.size();
+                System.out.println("📈 Population mode: Building index with " + vectorCount + " new vectors");
+            } else {
+                // During incremental updates: vectorsToAdd contains ALL vectors (existing + new)
+                vectorCount = vectorsToAdd.size();
+                System.out.println("📈 Incremental mode: Rebuilding index with " + vectorCount + " total vectors");
+            }
+            int vectorDimensions = getVectorDimensionsFromConfig();
             
             System.out.println("📈 Total vectors for CAGRA build: " + vectorCount);
             System.out.println("📏 Vector dimensions: " + vectorDimensions);
 
             // Create a matrix to hold all vectors
             float[][] matrixData = new float[vectorCount][vectorDimensions];
+            
+            // Clear and populate the index-to-nodeId mapping
+            indexToNodeIdMapping.clear();
+            
             for (int i = 0; i < vectorCount; i++) {
-                matrixData[i] = allVectors.get(i).getVector();
+                matrixData[i] = vectorsToAdd.get(i).getVector();
+                // Map vector index i to the actual Neo4j node ID
+                indexToNodeIdMapping.add(vectorsToAdd.get(i).getNodeId());
             }
             
             System.out.println("✅ Matrix created: " + matrixData.length + " x " + matrixData[0].length);
+            System.out.println("✅ Index-to-nodeId mapping created: " + indexToNodeIdMapping.size() + " entries");
+            System.out.println("   - First 5 mappings: " + indexToNodeIdMapping.stream().limit(5).collect(java.util.stream.Collectors.toList()));
+            System.out.println("   - Last 5 mappings: " + indexToNodeIdMapping.stream().skip(Math.max(0, indexToNodeIdMapping.size() - 5)).collect(java.util.stream.Collectors.toList()));
+            
+            // Debug: Check if node 0 is in the mapping
+            if (indexToNodeIdMapping.contains(0L)) {
+                int node0Index = indexToNodeIdMapping.indexOf(0L);
+                System.out.println("🎯 Node 0 found at vector index " + node0Index + " in mapping");
+            } else {
+                System.out.println("⚠️  Node 0 NOT found in mapping!");
+            }
+            
+            // DEBUG: Log population completion
+            System.out.println("🎯 INDEX POPULATION COMPLETION:");
+            System.out.println("   - Total vectors processed: " + vectorCount);
+            System.out.println("   - Expected TestQuestionCAGRA nodes: 1,000,000");
+            System.out.println("   - Difference: " + (vectorCount - 1000000) + " extra vectors");
+            if (vectorCount > 1000000) {
+                System.out.println("⚠️ WARNING: Processing more vectors than expected TestQuestionCAGRA nodes!");
+            }
             
             // ATOMIC INDEX REPLACEMENT: Build new index before destroying old one
             CagraIndex oldIndex = cuvsIndex;
@@ -706,7 +779,7 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
 
                 // Serialize the CAGRA index to disk for future fast loading
                 try {
-                    storage.serializeCagraIndex(newIndex);
+                    storage.serializeCagraIndexWithMapping(newIndex, indexToNodeIdMapping);
                     System.out.println("✅ CAGRA index serialized to disk");
                 } catch (Exception e) {
                     System.err.println("⚠️ Failed to serialize CAGRA index (non-critical): " + e.getMessage());
@@ -742,6 +815,25 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
         lock.readLock().lock();
         try {
             System.out.println("🔍 getCuvsIndex() called - cuvsIndex: " + cuvsIndex + ", isInitialized: " + isInitialized);
+            
+            // CRITICAL FIX: Load the CAGRA index if it's not already loaded
+            if (cuvsIndex == null && cuvsResources != null) {
+                System.out.println("🔧 CAGRA index is null, attempting to load from disk...");
+                // Release read lock before calling load() to avoid deadlock
+                lock.readLock().unlock();
+                try {
+                    load();
+                    System.out.println("✅ Successfully loaded CAGRA index from disk!");
+                    System.out.println("   - cuvsIndex after load: " + cuvsIndex);
+                } catch (Exception e) {
+                    System.err.println("❌ Failed to load CAGRA index: " + e.getMessage());
+                    e.printStackTrace();
+                } finally {
+                    // Re-acquire read lock for return
+                    lock.readLock().lock();
+                }
+            }
+            
             return cuvsIndex;
         } finally {
             lock.readLock().unlock();
@@ -891,15 +983,55 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
         System.out.println("🔄 load() method called - cuvsIndex before: " + cuvsIndex);
         lock.writeLock().lock();
         try {
-            if (isInitialized) {
-                throw new IllegalStateException("Index already initialized");
-            }
+        // Allow loading even if already initialized (for reopening existing indexes)
+        System.out.println("🔄 load() called - isInitialized: " + isInitialized + ", hasPersistedData: " + hasPersistedData());
             
             if (!storage.exists()) {
                 throw new IOException("Index storage does not exist");
             }
             
-            // Load index data
+            // Try to load CAGRA index first (the actual format we use)
+            if (storage.hasCagraIndex()) {
+                System.out.println("🔄 Loading serialized CAGRA index from disk");
+                System.out.println("   - Storage path: " + storage.getIndexDirectory());
+                System.out.println("   - CAGRA file exists: " + storage.hasCagraIndex());
+                System.out.println("   - cuvsResources: " + cuvsResources);
+                
+                java.util.AbstractMap.SimpleEntry<CagraIndex, List<Long>> deserializedData = storage.deserializeCagraIndexWithMapping(cuvsResources);
+                CagraIndex deserializedIndex = deserializedData.getKey();
+                List<Long> deserializedMapping = deserializedData.getValue();
+                
+                // Restore the node ID mapping
+                if (!deserializedMapping.isEmpty()) {
+                    indexToNodeIdMapping.clear();
+                    indexToNodeIdMapping.addAll(deserializedMapping);
+                    System.out.println("✅ Node ID mapping restored: " + indexToNodeIdMapping.size() + " entries");
+                    System.out.println("   - First 5 mappings: " + indexToNodeIdMapping.stream().limit(5).collect(java.util.stream.Collectors.toList()));
+                    System.out.println("   - Last 5 mappings: " + indexToNodeIdMapping.stream().skip(Math.max(0, indexToNodeIdMapping.size() - 5)).collect(java.util.stream.Collectors.toList()));
+                    // Debug: Check if node 0 is in the restored mapping
+                    if (indexToNodeIdMapping.contains(0L)) {
+                        int node0Index = indexToNodeIdMapping.indexOf(0L);
+                        System.out.println("🎯 Node 0 found at vector index " + node0Index + " in restored mapping");
+                    } else {
+                        System.out.println("⚠️  Node 0 NOT found in restored mapping!");
+                    }
+                } else {
+                    System.out.println("⚠️ No mapping found, will rebuild from vector data");
+                }
+                
+                setCuvsIndex(deserializedIndex);
+                System.out.println("✅ CAGRA index loaded successfully from disk!");
+                System.out.println("   - Final cuvsIndex: " + cuvsIndex);
+                
+                isInitialized = true;
+                // Update state to reflect that index is now ONLINE
+                storage.updateState("ONLINE", vectorCount, isGpuAvailable);
+                System.out.println("✅ State updated to ONLINE with " + vectorCount + " vectors");
+                return;
+            }
+            
+            // Fallback: Try to load using our custom serializer (legacy format)
+            System.out.println("📁 No serialized CAGRA index found, trying legacy format...");
             CuvsIndexSerializer.CuvsIndexData indexData = serializer.deserializeIndex(
                 storage.getIndexDataFile(), 
                 storage.getVectorDataFile()
@@ -930,9 +1062,17 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
             
             // Check GPU availability
             if (!GpuDetector.isGpuAvailable()) {
-                System.out.println("No GPU detected, falling back to development mode");
-                initializeMockMode();
-                return;
+                System.out.println("No GPU detected, but checking if we have a serialized CAGRA index...");
+                // If we have a serialized CAGRA index, try to load it anyway
+                // The index was built with GPU, so it should be loadable
+                if (storage.hasCagraIndex()) {
+                    System.out.println("Found serialized CAGRA index, attempting to load despite GPU detection failure");
+                    // Continue to try loading the serialized index
+                } else {
+                    System.out.println("No serialized CAGRA index found, falling back to development mode");
+                    initializeMockMode();
+                    return;
+                }
             }
             
             // Initialize GPU resources
@@ -954,15 +1094,27 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
                     System.out.println("   - CAGRA file exists: " + storage.hasCagraIndex());
                     System.out.println("   - cuvsResources: " + cuvsResources);
                     
-                    CagraIndex deserializedIndex = storage.deserializeCagraIndex(cuvsResources);
-                    System.out.println("   - Deserialized index: " + deserializedIndex);
+                    java.util.AbstractMap.SimpleEntry<CagraIndex, List<Long>> deserializedData = storage.deserializeCagraIndexWithMapping(cuvsResources);
+                    CagraIndex deserializedIndex = deserializedData.getKey();
+                    List<Long> deserializedMapping = deserializedData.getValue();
+                    
+                    // Restore the node ID mapping
+                    if (!deserializedMapping.isEmpty()) {
+                        indexToNodeIdMapping.clear();
+                        indexToNodeIdMapping.addAll(deserializedMapping);
+                        System.out.println("✅ Node ID mapping restored: " + indexToNodeIdMapping.size() + " entries");
+                    } else {
+                        System.out.println("⚠️ No mapping found, will rebuild from vector data");
+                    }
                     
                     setCuvsIndex(deserializedIndex);
                     System.out.println("✅ CAGRA index loaded successfully from disk!");
                     System.out.println("   - Final cuvsIndex: " + cuvsIndex);
                     
                     isInitialized = true;
+                    // Update state to reflect that index is now ONLINE
                     storage.updateState("ONLINE", vectorCount, isGpuAvailable);
+                    System.out.println("✅ State updated to ONLINE with " + vectorCount + " vectors");
                     return;
                 } catch (Exception e) {
                     System.err.println("❌ Failed to load serialized CAGRA index: " + e.getMessage());
@@ -1004,7 +1156,7 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
                     
                     // Serialize the CAGRA index to disk for future fast loading
                     try {
-                        storage.serializeCagraIndex(cuvsIndex);
+                        storage.serializeCagraIndexWithMapping(cuvsIndex, indexToNodeIdMapping);
                         System.out.println("✅ CAGRA index serialized to disk for future fast loading");
                     } catch (Exception e) {
                         System.err.println("⚠️ Failed to serialize CAGRA index (non-critical): " + e.getMessage());
@@ -1034,10 +1186,8 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
      * Check if the index has persisted data.
      */
     public boolean hasPersistedData() {
-        return storage.exists() && serializer.isValidIndex(
-            storage.getIndexDataFile(), 
-            storage.getVectorDataFile()
-        );
+        // Check if we have a serialized CAGRA index (the actual format we use)
+        return storage.hasCagraIndex();
     }
     
     /**
@@ -1113,6 +1263,25 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
     }
     
     /**
+     * Get the Neo4j node ID for a given vector index (position in CUVS matrix).
+     * This is used to map CUVS search results back to actual Neo4j node IDs.
+     * @param vectorIndex The index position in the CUVS matrix (0-based)
+     * @return The corresponding Neo4j node ID
+     * @throws IndexOutOfBoundsException if the vector index is invalid
+     */
+    public long getNodeIdForVectorIndex(int vectorIndex) {
+        if (vectorIndex < 0 || vectorIndex >= indexToNodeIdMapping.size()) {
+            throw new IndexOutOfBoundsException(
+                "Vector index " + vectorIndex + " is out of bounds. " +
+                "Valid range: 0 to " + (indexToNodeIdMapping.size() - 1)
+            );
+        }
+        long nodeId = indexToNodeIdMapping.get(vectorIndex);
+        System.out.println("🔗 Mapping vector index " + vectorIndex + " -> node ID " + nodeId);
+        return nodeId;
+    }
+    
+    /**
      * Data class representing a vector with its associated node ID.
      */
     public static class VectorData {
@@ -1180,7 +1349,7 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
         if (cuvsIndex == null) {
             throw new IllegalStateException("CAGRA index not initialized");
         }
-        storage.serializeCagraIndex(cuvsIndex);
+        storage.serializeCagraIndexWithMapping(cuvsIndex, indexToNodeIdMapping);
     }
     
     @Override
@@ -1188,7 +1357,18 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
         if (cuvsResources == null) {
             throw new IllegalStateException("CUVS resources not initialized");
         }
-        cuvsIndex = storage.deserializeCagraIndex(cuvsResources);
+        java.util.AbstractMap.SimpleEntry<CagraIndex, List<Long>> deserializedData = storage.deserializeCagraIndexWithMapping(cuvsResources);
+        cuvsIndex = deserializedData.getKey();
+        List<Long> deserializedMapping = deserializedData.getValue();
+        
+        // Restore the node ID mapping
+        if (!deserializedMapping.isEmpty()) {
+            indexToNodeIdMapping.clear();
+            indexToNodeIdMapping.addAll(deserializedMapping);
+            System.out.println("✅ Node ID mapping restored: " + indexToNodeIdMapping.size() + " entries");
+        } else {
+            System.out.println("⚠️ No mapping found, will rebuild from vector data");
+        }
     }
     
     @Override
@@ -1202,20 +1382,23 @@ public class CagraCuvsIndexImpl extends AbstractCuvsIndex<CuvsIndexReader> imple
         System.out.println("   - cuvsIndex: " + cuvsIndex);
         System.out.println("   - isInitialized: " + isInitialized);
         
-        // CRITICAL FIX: Load the CAGRA index if it's not already loaded
-        if (cuvsIndex == null && cuvsResources != null) {
-            System.out.println("🔧 CAGRA index is null, attempting to load from disk...");
-            try {
-                load();
-                System.out.println("✅ Successfully loaded CAGRA index from disk!");
-                System.out.println("   - cuvsIndex after load: " + cuvsIndex);
-            } catch (Exception e) {
-                System.err.println("❌ Failed to load CAGRA index: " + e.getMessage());
-                e.printStackTrace();
+        // Extract dimensions from index config (same logic as getIndexReader)
+        java.util.OptionalInt dimensions = java.util.OptionalInt.empty();
+        try {
+            Map<String, org.neo4j.values.storable.Value> config = descriptor.getIndexConfig().asMap();
+            if (config.containsKey("vector.dimensions")) {
+                org.neo4j.values.storable.Value dimValue = config.get("vector.dimensions");
+                if (dimValue instanceof org.neo4j.values.storable.IntValue) {
+                    int dims = ((org.neo4j.values.storable.IntValue) dimValue).value();
+                    dimensions = java.util.OptionalInt.of(dims);
+                    System.out.println("   - Extracted dimensions from config: " + dims);
+                }
             }
+        } catch (Exception e) {
+            System.out.println("   - Could not extract dimensions from config: " + e.getMessage());
         }
         
-        return new CuvsIndexReader(descriptor, null, this, java.util.OptionalInt.empty());
+        return new CuvsIndexReader(descriptor, null, this, dimensions, similarityFunction);
     }
     
     /**

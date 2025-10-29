@@ -35,6 +35,7 @@ import org.neo4j.io.pagecache.context.CursorContext;
 import org.neo4j.kernel.api.index.IndexProgressor;
 import org.neo4j.kernel.api.index.IndexSampler;
 import org.neo4j.kernel.api.index.ValueIndexReader;
+import org.neo4j.kernel.api.vector.VectorSimilarityFunction;
 import org.neo4j.kernel.impl.index.schema.IndexUsageTracking;
 import org.neo4j.kernel.impl.index.schema.PartitionedValueSeek;
 import org.neo4j.values.storable.FloatingPointArray;
@@ -55,16 +56,19 @@ public class CuvsIndexReader implements ValueIndexReader {
     private final IndexUsageTracking usageTracker;
     private final CagraCuvsIndexImpl cuvsIndex;
     private final OptionalInt dimensions;
+    private final VectorSimilarityFunction similarityFunction;
 
     public CuvsIndexReader(
             IndexDescriptor descriptor,
             IndexUsageTracking usageTracker,
             CagraCuvsIndexImpl cuvsIndex,
-            OptionalInt dimensions) {
+            OptionalInt dimensions,
+            VectorSimilarityFunction similarityFunction) {
         this.descriptor = descriptor;
         this.usageTracker = usageTracker;
         this.cuvsIndex = cuvsIndex;
         this.dimensions = dimensions;
+        this.similarityFunction = similarityFunction;
     }
 
     @Override
@@ -122,6 +126,8 @@ public class CuvsIndexReader implements ValueIndexReader {
                 String.format("Query vector has %d dimensions, but index expects %d dimensions.",
                     queryVector.length, dimensions.getAsInt()));
         }
+        
+        System.out.println("✅ Dimension validation passed - proceeding with search");
 
         // Calculate effective k (limit + skip)
         final var requestedK = nearestNeighborsPredicate.numberOfNeighbors();
@@ -142,10 +148,12 @@ public class CuvsIndexReader implements ValueIndexReader {
         final var progressor = new CuvsIndexProgressor(
             cuvsIndex.getCuvsIndex(),
             cuvsIndex.getCuvsResources(),
+            this, // Pass the CuvsIndexReader instance
             queryVector, 
             effectiveK, 
             (int) skip,
-            client);
+            client,
+            similarityFunction);
 
         // Initialize the client with our progressor
         System.out.println("CuvsIndexReader: Initializing client with progressor");
@@ -173,10 +181,12 @@ public class CuvsIndexReader implements ValueIndexReader {
     private static class CuvsIndexProgressor implements IndexProgressor {
         private final com.nvidia.cuvs.CagraIndex cuvsIndex;
         private final com.nvidia.cuvs.CuVSResources cuvsResources;
+        private final CuvsIndexReader reader; // Reference to the outer reader class
         private final float[] queryVector;
         private final int effectiveK;
         private final int skip;
         private final EntityValueClient client;
+        private final VectorSimilarityFunction similarityFunction;
         
         private List<SearchResult> searchResults;
         private int currentIndex = 0;
@@ -185,16 +195,20 @@ public class CuvsIndexReader implements ValueIndexReader {
         public CuvsIndexProgressor(
                 com.nvidia.cuvs.CagraIndex cuvsIndex,
                 com.nvidia.cuvs.CuVSResources cuvsResources,
+                CuvsIndexReader reader,
                 float[] queryVector,
                 int effectiveK,
                 int skip,
-                EntityValueClient client) {
+                EntityValueClient client,
+                VectorSimilarityFunction similarityFunction) {
             this.cuvsIndex = cuvsIndex;
             this.cuvsResources = cuvsResources;
+            this.reader = reader;
             this.queryVector = queryVector;
             this.effectiveK = effectiveK;
             this.skip = skip;
             this.client = client;
+            this.similarityFunction = similarityFunction;
         }
 
         @Override
@@ -255,9 +269,12 @@ public class CuvsIndexReader implements ValueIndexReader {
             
             System.out.println("GPU mode: Performing actual CUVS search");
             
-            // Create search parameters for CAGRA
+            // Create search parameters for CAGRA - MODERATE ACCURACY CONFIGURATION
+            // Based on CUVS documentation recommendations for exact match detection
             CagraSearchParams searchParams = new CagraSearchParams.Builder(cuvsResources)
-                .withMaxIterations(20)
+                .withItopkSize(128)        // 2x default - "main knob" for accuracy vs speed
+                .withMaxIterations(50)     // 2.5x current - explicit value for better accuracy
+                .withSearchWidth(2)        // 2x default - more exploration of search space
                 .build();
             
             // Create CagraQuery
@@ -282,8 +299,8 @@ public class CuvsIndexReader implements ValueIndexReader {
             }
             
             // Convert results to our format
-            // CUVS returns Map<Integer, Float> where key is index position, not node ID
-            // For now, we'll assume the key is the node ID (this might need fixing later)
+            // CUVS returns Map<Integer, Float> where key is vector index (position in matrix)
+            // We need to map these indices to actual Neo4j node IDs using the index mapping
             List<SearchResult> results = new ArrayList<>();
             List<Map<Integer, Float>> resultMaps = searchResults.getResults();
             System.out.println("CuvsIndexProgressor: CUVS returned " + resultMaps.size() + " result maps");
@@ -293,10 +310,17 @@ public class CuvsIndexReader implements ValueIndexReader {
                 System.out.println("CuvsIndexProgressor: First query has " + firstQueryResults.size() + " results");
                 
                 for (Map.Entry<Integer, Float> entry : firstQueryResults.entrySet()) {
-                    long nodeId = entry.getKey(); // This might be wrong - could be index position
-                    float score = entry.getValue();
-                    System.out.println("CuvsIndexProgressor: Result - nodeId: " + nodeId + ", score: " + score);
-                    results.add(new SearchResult(nodeId, score, Map.of()));
+                    int vectorIndex = entry.getKey(); // This is the vector index, not node ID
+                    float distance = entry.getValue();
+                    
+                    // Convert vector index to actual Neo4j node ID using the mapping
+                    long nodeId = reader.cuvsIndex.getNodeIdForVectorIndex(vectorIndex);
+                    
+                    // Convert distance to similarity score based on the similarity function
+                    float similarity = convertDistanceToSimilarity(distance, similarityFunction);
+                    
+                    System.out.println("CuvsIndexProgressor: Result - vectorIndex: " + vectorIndex + ", nodeId: " + nodeId + ", distance: " + distance + ", similarity: " + similarity);
+                    results.add(new SearchResult(nodeId, similarity, Map.of()));
                 }
             }
             
@@ -334,6 +358,30 @@ public class CuvsIndexReader implements ValueIndexReader {
 
         public Map<String, Object> getProperties() {
             return properties;
+        }
+    }
+    
+    /**
+     * Convert CUVS distance to Neo4j similarity score based on the similarity function.
+     * Different distance metrics require different transformations.
+     */
+    private static float convertDistanceToSimilarity(float distance, VectorSimilarityFunction similarityFunction) {
+        if (similarityFunction.name().equals("EUCLIDEAN")) {
+            // For Euclidean distance (L2): similarity = 1 / (1 + distance)
+            // This ensures similarity is between 0 and 1, with higher values being more similar
+            return 1.0f / (1.0f + distance);
+        } else if (similarityFunction.name().equals("COSINE")) {
+            // For cosine distance: similarity = 1 - distance
+            // Cosine distance is already between 0 and 1, where 0 = identical, 1 = orthogonal
+            return Math.max(0.0f, 1.0f - distance);
+        } else if (similarityFunction.name().equals("DOT_PRODUCT")) {
+            // For dot product: the raw value is already a similarity score
+            // Higher values mean more similar, but we need to normalize/clamp
+            return Math.max(0.0f, Math.min(1.0f, distance));
+        } else {
+            // Default fallback for unknown similarity functions
+            System.out.println("Unknown similarity function: " + similarityFunction.name() + ", using Euclidean transformation");
+            return 1.0f / (1.0f + distance);
         }
     }
     
