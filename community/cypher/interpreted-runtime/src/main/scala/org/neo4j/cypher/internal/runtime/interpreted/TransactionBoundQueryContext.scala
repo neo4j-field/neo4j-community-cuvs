@@ -338,9 +338,11 @@ sealed class TransactionBoundQueryContext(
       case EntityType.NODE         => SchemaDescriptors.forLabel(entityId, propertyKeyIds: _*)
       case EntityType.RELATIONSHIP => SchemaDescriptors.forRelType(entityId, propertyKeyIds: _*)
     }
-    val prototype = provider.map(p => IndexPrototype.forSchema(descriptor, p)).getOrElse(
+    val prototype = provider.map(p => {
+      IndexPrototype.forSchema(descriptor, p)
+    }).getOrElse({
       IndexPrototype.forSchema(descriptor)
-    ).withIndexType(indexType)
+    }).withIndexType(indexType)
     val namedPrototype = name.map(n => prototype.withName(n)).getOrElse(prototype)
     (descriptor, namedPrototype)
   }

@@ -74,7 +74,8 @@ public class CuvsIndexReaderTest {
                 descriptor,
                 mock(IndexUsageTracking.class),
                 index,
-                java.util.OptionalInt.of(3)
+                java.util.OptionalInt.of(3),
+                VectorSimilarityFunctions.EUCLIDEAN
             );
 
             // Then
@@ -93,7 +94,8 @@ public class CuvsIndexReaderTest {
             descriptor,
             mock(IndexUsageTracking.class),
             index,
-            java.util.OptionalInt.of(3)
+            java.util.OptionalInt.of(3),
+            VectorSimilarityFunctions.EUCLIDEAN
         );
 
         PropertyIndexQuery query = mock(PropertyIndexQuery.class);
@@ -119,7 +121,8 @@ public class CuvsIndexReaderTest {
             descriptor,
             mock(IndexUsageTracking.class),
             index,
-            java.util.OptionalInt.of(3)
+            java.util.OptionalInt.of(3),
+            VectorSimilarityFunctions.EUCLIDEAN
         );
 
         PropertyIndexQuery query1 = mock(PropertyIndexQuery.class);
@@ -145,7 +148,8 @@ public class CuvsIndexReaderTest {
             descriptor,
             mock(IndexUsageTracking.class),
             index,
-            java.util.OptionalInt.of(3) // Index expects 3 dimensions
+            java.util.OptionalInt.of(3), // Index expects 3 dimensions
+            VectorSimilarityFunctions.EUCLIDEAN
         );
 
         PropertyIndexQuery.NearestNeighborsPredicate query = mock(PropertyIndexQuery.NearestNeighborsPredicate.class);
@@ -189,7 +193,8 @@ public class CuvsIndexReaderTest {
                 descriptor,
                 mock(IndexUsageTracking.class),
                 index,
-                java.util.OptionalInt.of(3)
+                java.util.OptionalInt.of(3),
+                VectorSimilarityFunctions.EUCLIDEAN
             );
 
             PropertyIndexQuery.NearestNeighborsPredicate query = mock(PropertyIndexQuery.NearestNeighborsPredicate.class);

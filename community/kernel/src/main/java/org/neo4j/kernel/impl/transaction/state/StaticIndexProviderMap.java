@@ -133,19 +133,34 @@ public class StaticIndexProviderMap extends LifecycleAdapter implements IndexPro
             System.out.println("Returning CUVS provider: " + cuvsV1IndexProvider.getProviderDescriptor());
             return cuvsV1IndexProvider;
         }
-        System.out.println("CUVS provider is null, falling back to Lucene");
-        return vectorV2IndexProvider != null ? vectorV2IndexProvider : vectorV1IndexProvider;
+        
+        // Fall back to Lucene providers
+        if (vectorV2IndexProvider != null) {
+            System.out.println("CUVS provider is null, falling back to Lucene V2");
+            return vectorV2IndexProvider;
+        }
+        
+        if (vectorV1IndexProvider != null) {
+            System.out.println("CUVS provider is null, falling back to Lucene V1");
+            return vectorV1IndexProvider;
+        }
+        
+        System.out.println("ERROR: All vector providers are null!");
+        throw new IllegalStateException("No vector index provider available");
     }
 
     @Override
     public IndexProvider lookup(IndexProviderDescriptor providerDescriptor) {
-        System.out.println("lookup() called with descriptor: " + providerDescriptor);
+        System.out.println("🔍 lookup() called with descriptor: " + providerDescriptor);
+        System.out.println("🔍 Available providers in map:");
+        indexProvidersByDescriptor.forEach((desc, prov) -> 
+            System.out.println("  - " + desc + " -> " + prov));
+        
         IndexProvider provider = indexProvidersByDescriptor.get(providerDescriptor);
-        System.out.println("Found provider: " + provider);
+        System.out.println("🔍 Found provider: " + provider);
+        
         if (provider == null) {
-            System.out.println("Provider not found! Available providers:");
-            indexProvidersByDescriptor.forEach((desc, prov) -> 
-                System.out.println("  - " + desc + " -> " + prov));
+            System.out.println("❌ Provider not found for: " + providerDescriptor);
         }
         assertProviderFound(provider, providerDescriptor.name());
         return provider;

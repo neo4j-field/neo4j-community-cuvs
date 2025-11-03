@@ -1763,22 +1763,33 @@ public class Operations implements Write, SchemaWrite, Upgrade {
     }
 
     private IndexPrototype useLatestIndexProviderVersion(IndexPrototype prototype) {
-        System.out.println("useLatestIndexProviderVersion called with prototype: " + prototype);
-        System.out.println("prototype.getIndexProvider(): " + prototype.getIndexProvider());
-        System.out.println("AllIndexProviderDescriptors.UNDECIDED: " + AllIndexProviderDescriptors.UNDECIDED);
-        System.out.println("alwaysUseLatestIndexProvider: " + alwaysUseLatestIndexProvider);
+        System.out.println("🔍 ENHANCED DEBUG: useLatestIndexProviderVersion called with prototype: " + prototype);
+        System.out.println("🔍 ENHANCED DEBUG: prototype.getIndexProvider(): " + prototype.getIndexProvider());
+        System.out.println("🔍 ENHANCED DEBUG: AllIndexProviderDescriptors.UNDECIDED: " + AllIndexProviderDescriptors.UNDECIDED);
+        System.out.println("🔍 ENHANCED DEBUG: alwaysUseLatestIndexProvider: " + alwaysUseLatestIndexProvider);
         
-        IndexProviderDescriptor indexProviderDescriptor =
-                alwaysUseLatestIndexProvider || prototype.getIndexProvider() == AllIndexProviderDescriptors.UNDECIDED
-                        ? switch (prototype.getIndexType()) {
-                            case LOOKUP -> indexProviders.getTokenIndexProvider();
-                            case FULLTEXT -> indexProviders.getFulltextProvider();
-                            case TEXT -> indexProviders.getTextIndexProvider();
-                            case RANGE -> indexProviders.getDefaultProvider();
-                            case POINT -> indexProviders.getPointIndexProvider();
-                            case VECTOR -> indexProviders.getVectorIndexProvider();
-                        }
-                        : prototype.getIndexProvider();
+        // DEBUG: Check the exact comparison
+        boolean isUndecided = prototype.getIndexProvider() == AllIndexProviderDescriptors.UNDECIDED;
+        System.out.println("prototype.getIndexProvider() == AllIndexProviderDescriptors.UNDECIDED: " + isUndecided);
+        System.out.println("prototype.getIndexProvider().equals(AllIndexProviderDescriptors.UNDECIDED): " + prototype.getIndexProvider().equals(AllIndexProviderDescriptors.UNDECIDED));
+        
+        // FIXED: Respect user's explicit indexProvider choice even when alwaysUseLatestIndexProvider is true
+        // Only auto-select when the provider is UNDECIDED (not explicitly specified)
+        IndexProviderDescriptor indexProviderDescriptor;
+        if (prototype.getIndexProvider() == AllIndexProviderDescriptors.UNDECIDED) {
+            System.out.println("Auto-selecting provider because provider is UNDECIDED");
+            indexProviderDescriptor = switch (prototype.getIndexType()) {
+                case LOOKUP -> indexProviders.getTokenIndexProvider();
+                case FULLTEXT -> indexProviders.getFulltextProvider();
+                case TEXT -> indexProviders.getTextIndexProvider();
+                case RANGE -> indexProviders.getDefaultProvider();
+                case POINT -> indexProviders.getPointIndexProvider();
+                case VECTOR -> indexProviders.getVectorIndexProvider();
+            };
+        } else {
+            System.out.println("Using explicit provider: " + prototype.getIndexProvider());
+            indexProviderDescriptor = prototype.getIndexProvider();
+        }
         
         System.out.println("Selected indexProviderDescriptor: " + indexProviderDescriptor);
         final var indexProvider = indexProviders.getIndexProvider(indexProviderDescriptor);

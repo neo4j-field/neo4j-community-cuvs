@@ -366,11 +366,21 @@ public class MultipleIndexPopulator implements StoreScan.ExternalUpdatesCheck, A
     }
 
     private int[] entityTokenIds() {
-        return populations.stream()
+        System.out.println("🔍 MultipleIndexPopulator.entityTokenIds() called");
+        System.out.println("🔍 Number of populations: " + populations.size());
+        for (int i = 0; i < populations.size(); i++) {
+            var population = populations.get(i);
+            System.out.println("🔍 Population " + i + ": " + population.schema() + " -> " + Arrays.toString(population.schema().getEntityTokenIds()));
+        }
+        
+        int[] result = populations.stream()
                 .flatMapToInt(population -> Arrays.stream(population.schema().getEntityTokenIds()))
                 .sorted()
                 .distinct()
                 .toArray();
+        
+        System.out.println("🔍 Final entityTokenIds: " + Arrays.toString(result));
+        return result;
     }
 
     /**

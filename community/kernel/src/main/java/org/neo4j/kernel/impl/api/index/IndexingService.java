@@ -960,14 +960,16 @@ public class IndexingService extends LifecycleAdapter implements IndexUpdateList
      * @param lookupIndexDifferentiator whether the category is for {@link IndexType#LOOKUP lookup index} and the
      * database's {@link StorageEngineIndexingBehaviour} hints that such indexes needs to be populated by a specific scan,
      * i.e. requiring its own category (which translates to its own population job).
+     * @param indexProvider the index provider to ensure different providers get separate population jobs
      */
-    private record IndexPopulationCategory(EntityType entityType, boolean lookupIndexDifferentiator) {
+    private record IndexPopulationCategory(EntityType entityType, boolean lookupIndexDifferentiator, IndexProviderDescriptor indexProvider) {
         IndexPopulationCategory(IndexDescriptor descriptor, StorageEngineIndexingBehaviour indexingBehaviour) {
             this(
                     descriptor.schema().entityType(),
                     descriptor.schema().entityType() == RELATIONSHIP
                             && indexingBehaviour.useNodeIdsInRelationshipTokenIndex()
-                            && descriptor.isTokenIndex());
+                            && descriptor.isTokenIndex(),
+                    descriptor.getIndexProvider());
         }
     }
 }
